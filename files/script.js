@@ -1,34 +1,4 @@
-// ===== SPORTS IMAGES (JS LOOP – WORKING) =====
-document.addEventListener("DOMContentLoaded", () => {
-    const sportImages = {
-        tennis: "images/table-tennis.png",
-        football: "images/football.png",
-        badminton: "images/badminton.png",
-        basketball: "images/basketball.png"
-    };
-
-    document.querySelectorAll(".sport-card").forEach(card => {
-        const sportKey = card.dataset.sport;
-
-        // Skip cards without a sport key (like Coming Soon ones)
-        if (!sportKey || !sportImages[sportKey]) return;
-
-        // Create image element
-        const img = document.createElement("img");
-        img.src = sportImages[sportKey];
-        img.alt = sportKey;
-        img.className = "sport-card-image";
-
-        // Debug (VERY useful)
-        img.onerror = () => {
-            console.error("❌ Image failed to load:", img.src);
-        };
-
-        // Insert image at top of card
-        card.insertBefore(img, card.firstChild);
-    });
-});
-
+// ===== NAVIGATION LOGIC =====
 const navLinks = document.querySelectorAll('.nav-link');
 const sections = document.querySelectorAll('.page-section');
 
@@ -680,3 +650,130 @@ window.addEventListener('DOMContentLoaded', () => {
     updateBMIIndicator();
     updateCaloriesProgress();
 });
+// ========================================
+// FEATURE 1, 2, 3: ENHANCED FEATURES
+// ========================================
+
+// ===== FEATURE 3: USER NAME GREETING AND VISIT COUNTER =====
+// Function to handle user greeting and visit tracking
+function initUserGreeting() {
+    const userGreetingDiv = document.getElementById('userGreeting');
+    
+    if (!userGreetingDiv) return;
+    
+    // Get stored user name from localStorage
+    let userName = localStorage.getItem('userName');
+    
+    // If no name is stored, ask the user for their name
+    if (!userName) {
+        userName = prompt('Welcome to KineticAI! Please enter your name:');
+        
+        // If user provides a name, store it
+        if (userName && userName.trim() !== '') {
+            userName = userName.trim();
+            localStorage.setItem('userName', userName);
+        } else {
+            // Default name if user cancels or enters nothing
+            userName = 'Guest';
+        }
+    }
+    
+    // Get visit count from localStorage
+    let visitCount = localStorage.getItem('visitCount');
+    
+    // Initialize or increment visit count
+    if (visitCount === null) {
+        visitCount = 1;
+    } else {
+        visitCount = Number(visitCount) + 1;
+    }
+    
+    // Store updated visit count
+    localStorage.setItem('visitCount', visitCount);
+    
+    // Create greeting message
+    const greetingHTML = `
+        <h2>Hello, ${userName}! 👋</h2>
+        <p>You have visited this page <strong>${visitCount}</strong> ${visitCount === 1 ? 'time' : 'times'}.</p>
+    `;
+    
+    // Display greeting
+    userGreetingDiv.innerHTML = greetingHTML;
+}
+
+// ===== FEATURE 2: DISPLAY IMAGES USING JAVASCRIPT LOOP =====
+// Function to dynamically create and display image gallery
+function createImageGallery() {
+    const imageGalleryDiv = document.getElementById('imageGallery');
+    
+    if (!imageGalleryDiv) return;
+    
+    // Array of sports images with their details
+    // Using local SVG images stored in the images folder
+    const sportsImages = [
+        {
+            url: 'images/table-tennis.png',
+            title: 'Table Tennis',
+            description: 'Fast-paced racket sport'
+        },
+        {
+            url: 'images/football.png',
+            title: 'Football',
+            description: 'The beautiful game'
+        },
+        {
+            url: 'images/badminton.png',
+            title: 'Badminton',
+            description: 'Precision and agility'
+        },
+        {
+            url: 'images/basketball.png',
+            title: 'Basketball',
+            description: 'Team sport excellence'
+        }
+    ];
+    
+    // Clear any existing content
+    imageGalleryDiv.innerHTML = '';
+    
+    // Use forEach loop to iterate through images array
+    sportsImages.forEach(function(sport, index) {
+        // Create gallery item container
+        const galleryItem = document.createElement('div');
+        galleryItem.className = 'gallery-item';
+        
+        // Create image element
+        const img = document.createElement('img');
+        img.src = sport.url;
+        img.alt = sport.title;
+        img.loading = 'lazy';
+        
+        // Create caption container
+        const caption = document.createElement('div');
+        caption.className = 'gallery-item-caption';
+        
+        // Create title element
+        const title = document.createElement('div');
+        title.className = 'gallery-item-title';
+        title.textContent = sport.title;
+        
+        // Create description element
+        const desc = document.createElement('div');
+        desc.className = 'gallery-item-desc';
+        desc.textContent = sport.description;
+        
+        // Assemble the gallery item
+        caption.appendChild(title);
+        caption.appendChild(desc);
+        galleryItem.appendChild(img);
+        galleryItem.appendChild(caption);
+        
+        // Add to gallery
+        imageGalleryDiv.appendChild(galleryItem);
+    });
+}
+window.addEventListener('DOMContentLoaded', function() {
+    initUserGreeting();
+    createImageGallery();
+});
+

@@ -12,14 +12,9 @@ body {
     overflow-x: hidden;
     min-height: 100vh;
 }
-
-.sport-card-image {
-    width: 100%;
-    height: 160px;
-    object-fit: cover;
-    border-radius: 14px;
-    margin-bottom: 12px;
-    display: block;
+.gallery-item img {
+    height: 120px;   /* ← make this smaller if you want */
+    width: auto;
 }
 
 /* ===== NAVIGATION ===== */
@@ -1019,4 +1014,165 @@ nav {
     .calendar-week-labels {
         grid-template-columns: 20px 1fr;
     }
+}
+/* ===== FEATURE 1: DYNAMIC BACKGROUND ANIMATION ===== */
+/* Animated background color gradient */
+@keyframes backgroundColorChange {
+    0% {
+        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1428 100%);
+    }
+    25% {
+        background: linear-gradient(135deg, #1a1f3a 0%, #0f1428 50%, #1e2545 100%);
+    }
+    50% {
+        background: linear-gradient(135deg, #0f1428 0%, #1e2545 50%, #0a0e27 100%);
+    }
+    75% {
+        background: linear-gradient(135deg, #1e2545 0%, #0a0e27 50%, #1a1f3a 100%);
+    }
+    100% {
+        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1428 100%);
+    }
+}
+
+/* Apply animation to body */
+body {
+    animation: backgroundColorChange 15s ease-in-out infinite;
+}
+
+/* Enhanced title with text shadow */
+.main-title {
+    text-shadow: 0 0 20px rgba(40, 199, 111, 0.6),
+                 0 0 40px rgba(40, 199, 111, 0.4),
+                 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ===== FEATURE 3: USER GREETING SECTION ===== */
+.user-greeting {
+    margin: 1.5rem auto;
+    padding: 1.5rem 2rem;
+    background: rgba(40, 199, 111, 0.1);
+    border: 2px solid rgba(40, 199, 111, 0.3);
+    border-radius: 12px;
+    max-width: 600px;
+    text-align: center;
+}
+
+.user-greeting h2 {
+    font-size: 1.8rem;
+    color: #28c76f;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.user-greeting p {
+    font-size: 1.1rem;
+    color: #d0d4ff;
+}
+
+/* ===== FEATURE 2: DYNAMIC IMAGE GALLERY ===== */
+.image-gallery-section {
+    margin: 3rem auto;
+    max-width: 1200px;
+}
+
+.image-gallery-section h3 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: #28c76f;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.image-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.gallery-item {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.gallery-item:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(40, 199, 111, 0.3);
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+}
+
+.gallery-item-caption {
+    padding: 1rem;
+    background: rgba(11, 16, 32, 0.9);
+    text-align: center;
+}
+
+.gallery-item-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #28c76f;
+    margin-bottom: 0.25rem;
+}
+
+.gallery-item-desc {
+    font-size: 0.9rem;
+    color: #c4c7ff;
+}
+/* FORCE image size override */
+/* FINAL FIX: center & lock gallery images */
+.image-gallery .gallery-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-gallery .gallery-item img {
+    width: auto !important;
+    height: 90px !important;        /* 👈 adjust size here */
+    max-height: 90px !important;
+    object-fit: contain !important;
+    margin: 0 auto 0.75rem auto;
+    display: block;
+}
+/* Full-width bottom caption bar */
+.image-gallery .gallery-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.image-gallery .gallery-item-caption {
+    width: 100%;
+    background: linear-gradient(
+        180deg,
+        rgba(10, 15, 35, 0.85),
+        rgba(5, 10, 25, 0.95)
+    );
+    padding: 1rem 0.75rem;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+/* Text styling */
+.image-gallery .gallery-item-caption h4 {
+    color: #28c76f;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+}
+
+.image-gallery .gallery-item-caption p {
+    color: #d0d4ff;
+    font-size: 0.9rem;
+    margin: 0;
 }

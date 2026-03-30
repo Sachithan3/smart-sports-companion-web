@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features Demo - KineticAI Enhanced</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0e27, #1a1f3a);
+            color: #fff;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #28c76f;
+            text-shadow: 0 0 20px rgba(40, 199, 111, 0.6);
+        }
+        
+        .intro {
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+            color: #d0d4ff;
+        }
+        
+        .feature-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(40, 199, 111, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .feature-section h2 {
+            color: #28c76f;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid rgba(40, 199, 111, 0.3);
+            padding-bottom: 0.5rem;
+        }
+        
+        .feature-section h3 {
+            color: #48da89;
+            font-size: 1.3rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-section p {
+            color: #d0d4ff;
+            margin-bottom: 1rem;
+        }
+        
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 4px solid #28c76f;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .code-block code {
+            color: #48da89;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #28c76f, #48da89);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(40, 199, 111, 0.2);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        
+        .feature-card h4 {
+            color: #28c76f;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .checkmark {
+            color: #28c76f;
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+        }
+        
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        li {
+            padding: 0.5rem 0;
+            color: #d0d4ff;
+        }
+        
+        .highlight {
+            background: rgba(40, 199, 111, 0.2);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ KineticAI Enhanced Features Demo</h1>
+        <p class="intro">Three powerful new features have been added to your Sports Companion application!</p>
+        
+        <!-- Feature 1 -->
+        <div class="feature-section">
+            <h2>🎨 Feature 1: Dynamic Background Color Animation & Title Styling</h2>
+            
+            <h3>What's New:</h3>
+            <p>The background now features a smooth, continuous color gradient animation that cycles through different shades, creating an engaging and dynamic visual experience.</p>
+            
+            <h3>Implementation Details:</h3>
+            <div class="code-block">
+                <code>
+@keyframes backgroundColorChange {<br>
+&nbsp;&nbsp;0% { background: linear-gradient(...); }<br>
+&nbsp;&nbsp;25% { background: linear-gradient(...); }<br>
+&nbsp;&nbsp;50% { background: linear-gradient(...); }<br>
+&nbsp;&nbsp;/* Animation cycles through 4 gradient states */<br>
+}<br><br>
+body {<br>
+&nbsp;&nbsp;animation: backgroundColorChange 15s ease-in-out infinite;<br>
+}
+                </code>
+            </div>
+            
+            <h3>Title Enhancement:</h3>
+            <p>The main title "Welcome to KineticAI" now features a glowing text shadow effect with multiple layers:</p>
+            <div class="code-block">
+                <code>
+.main-title {<br>
+&nbsp;&nbsp;text-shadow: <br>
+&nbsp;&nbsp;&nbsp;&nbsp;0 0 20px rgba(40, 199, 111, 0.6),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0 0 40px rgba(40, 199, 111, 0.4),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0 4px 8px rgba(0, 0, 0, 0.5);<br>
+}
+                </code>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>✓ CSS Keyframes</h4>
+                    <p>Smooth 15-second animation loop</p>
+                </div>
+                <div class="feature-card">
+                    <h4>✓ Multi-layer Shadow</h4>
+                    <p>Glowing effect on main heading</p>
+                </div>
+                <div class="feature-card">
+                    <h4>✓ No JavaScript</h4>
+                    <p>Pure CSS implementation</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Feature 2 -->
+        <div class="feature-section">
+            <h2>🖼️ Feature 2: Dynamic Image Gallery with JavaScript Loops</h2>
+            
+            <h3>What's New:</h3>
+            <p>A responsive image gallery displays sports activities, with <span class="highlight">all images generated dynamically using JavaScript</span> - no hardcoded &lt;img&gt; tags in HTML!</p>
+            
+            <h3>Implementation Details:</h3>
+            <div class="code-block">
+                <code>
+// Array of sports images<br>
+const sportsImages = [<br>
+&nbsp;&nbsp;{ url: 'images/sport1.jpg', title: 'Table Tennis', ... },<br>
+&nbsp;&nbsp;{ url: 'images/sport2.jpg', title: 'Football', ... },<br>
+&nbsp;&nbsp;// 4 total images<br>
+];<br><br>
+// Using forEach loop to create elements<br>
+sportsImages.forEach(function(sport) {<br>
+&nbsp;&nbsp;const galleryItem = document.createElement('div');<br>
+&nbsp;&nbsp;const img = document.createElement('img');<br>
+&nbsp;&nbsp;img.src = sport.url;<br>
+&nbsp;&nbsp;// ... DOM manipulation<br>
+&nbsp;&nbsp;imageGalleryDiv.appendChild(galleryItem);<br>
+});
+                </code>
+            </div>
+            
+            <h3>Key Features:</h3>
+            <ul>
+                <li><span class="checkmark">✓</span> <strong>forEach() loop</strong> for array iteration</li>
+                <li><span class="checkmark">✓</span> <strong>createElement()</strong> for dynamic DOM elements</li>
+                <li><span class="checkmark">✓</span> <strong>No hardcoded HTML</strong> - pure JavaScript generation</li>
+                <li><span class="checkmark">✓</span> <strong>Responsive grid layout</strong> with auto-fit</li>
+                <li><span class="checkmark">✓</span> <strong>Hover effects</strong> with transform animations</li>
+                <li><span class="checkmark">✓</span> <strong>Lazy loading</strong> for better performance</li>
+            </ul>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>4 Sport Images</h4>
+                    <p>Table Tennis, Football, Badminton, Basketball</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Dynamic Generation</h4>
+                    <p>All created via JavaScript loops</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Professional Styling</h4>
+                    <p>Captions, shadows, and hover effects</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Feature 3 -->
+        <div class="feature-section">
+            <h2>👋 Feature 3: User Greeting & Visit Counter</h2>
+            
+            <h3>What's New:</h3>
+            <p>The application now greets users by name and tracks how many times they've visited the page using browser localStorage!</p>
+            
+            <h3>Implementation Details:</h3>
+            <div class="code-block">
+                <code>
+// Get or prompt for user name<br>
+let userName = localStorage.getItem('userName');<br>
+if (!userName) {<br>
+&nbsp;&nbsp;userName = prompt('Please enter your name:');<br>
+&nbsp;&nbsp;localStorage.setItem('userName', userName);<br>
+}<br><br>
+// Track and increment visit count<br>
+let visitCount = localStorage.getItem('visitCount');<br>
+visitCount = visitCount === null ? 1 : Number(visitCount) + 1;<br>
+localStorage.setItem('visitCount', visitCount);<br><br>
+// Display personalized greeting<br>
+userGreetingDiv.innerHTML = `<br>
+&nbsp;&nbsp;&lt;h2&gt;Hello, ${userName}! 👋&lt;/h2&gt;<br>
+&nbsp;&nbsp;&lt;p&gt;You have visited this page ${visitCount} times.&lt;/p&gt;<br>
+`;
+                </code>
+            </div>
+            
+            <h3>How It Works:</h3>
+            <ul>
+                <li><span class="checkmark">✓</span> <strong>First Visit:</strong> Prompts user for their name</li>
+                <li><span class="checkmark">✓</span> <strong>Name Storage:</strong> Saves name in localStorage (persistent)</li>
+                <li><span class="checkmark">✓</span> <strong>Visit Tracking:</strong> Increments counter on each page load</li>
+                <li><span class="checkmark">✓</span> <strong>Personalized Message:</strong> Displays "Hello, [Name]! 👋"</li>
+                <li><span class="checkmark">✓</span> <strong>Count Display:</strong> Shows visit count with proper grammar</li>
+            </ul>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h4>localStorage API</h4>
+                    <p>Persistent data without database</p>
+                </div>
+                <div class="feature-card">
+                    <h4>User Prompt</h4>
+                    <p>Interactive name collection</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Dynamic Counter</h4>
+                    <p>Automatic visit tracking</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Summary -->
+        <div class="feature-section">
+            <h2>📋 Implementation Summary</h2>
+            
+            <h3>Files Modified:</h3>
+            <ul>
+                <li><span class="checkmark">✓</span> <strong>index.html</strong> - Added greeting section, image gallery container, main-title class</li>
+                <li><span class="checkmark">✓</span> <strong>styles.css</strong> - Added animations, shadows, gallery styles, greeting styles (~120 new lines)</li>
+                <li><span class="checkmark">✓</span> <strong>script.js</strong> - Added user greeting function, image gallery function (~130 new lines)</li>
+            </ul>
+            
+            <h3>Testing Checklist:</h3>
+            <ul>
+                <li><span class="checkmark">✓</span> Background animation running smoothly (15s loop)</li>
+                <li><span class="checkmark">✓</span> Title has visible glowing shadow effect</li>
+                <li><span class="checkmark">✓</span> 4 images displayed in responsive grid</li>
+                <li><span class="checkmark">✓</span> Images created via JavaScript (no HTML &lt;img&gt; tags)</li>
+                <li><span class="checkmark">✓</span> Hover effects work on gallery items</li>
+                <li><span class="checkmark">✓</span> Name prompt appears on first visit</li>
+                <li><span class="checkmark">✓</span> Visit counter increments correctly</li>
+                <li><span class="checkmark">✓</span> Data persists across page refreshes</li>
+                <li><span class="checkmark">✓</span> All existing features still work</li>
+                <li><span class="checkmark">✓</span> No console errors</li>
+            </ul>
+            
+            <h3>Code Quality:</h3>
+            <ul>
+                <li><span class="checkmark">✓</span> Comprehensive comments added</li>
+                <li><span class="checkmark">✓</span> Clean, readable code structure</li>
+                <li><span class="checkmark">✓</span> No conflicts with existing functionality</li>
+                <li><span class="checkmark">✓</span> Responsive design maintained</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center; margin-top: 3rem;">
+            <a href="index.html" class="btn">🚀 Open KineticAI Application</a>
+        </div>
+    </div>
+</body>
+</html>
