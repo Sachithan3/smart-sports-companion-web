@@ -1,0 +1,1027 @@
+/* ===== GLOBAL STYLES ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1428 100%);
+    color: #f5f5f5;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+.sport-card-image {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* ===== NAVIGATION ===== */
+nav {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    background: rgba(11, 16, 32, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1000;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #28c76f, #48da89);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+}
+
+.nav-links a {
+    color: #f5f5f5;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #28c76f;
+    transition: width 0.3s ease;
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
+}
+
+/* ===== SECTIONS CONTAINER ===== */
+.page-section {
+    min-height: 100vh;
+    padding: 6rem 2rem 4rem;
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.page-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== HOME / DASHBOARD ===== */
+.hero {
+    text-align: center;
+    padding: 3rem 0;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.hero h1 {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #fff, #28c76f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    from { filter: drop-shadow(0 0 5px rgba(40, 199, 111, 0.3)); }
+    to { filter: drop-shadow(0 0 20px rgba(40, 199, 111, 0.6)); }
+}
+
+.hero p {
+    font-size: 1.3rem;
+    color: #d0d4ff;
+    margin-bottom: 2.5rem;
+    line-height: 1.6;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #28c76f, #48da89);
+    color: #0b1020;
+    box-shadow: 0 8px 20px rgba(40, 199, 111, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(40, 199, 111, 0.6);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #28c76f;
+}
+
+/* Dashboard Progress Trackers */
+.dashboard-trackers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 3rem auto;
+}
+
+.tracker-card {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2rem;
+    transition: all 0.4s ease;
+}
+
+.tracker-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(40, 199, 111, 0.2);
+    border-color: rgba(40, 199, 111, 0.3);
+}
+
+.tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.tracker-header h3 {
+    font-size: 1.2rem;
+    color: #f5f5f5;
+    margin: 0;
+}
+
+.tracker-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #28c76f;
+}
+
+.progress-bar-container {
+    width: 100%;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28c76f, #48da89);
+    border-radius: 999px;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress-bar-fill[style*="width: 0%"] {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.progress-bar-fill[style*="width: 1%"] {
+    background: rgba(255, 167, 38, 0.5);
+}
+
+.progress-bar-fill[style*="width: 2%"] {
+    background: rgba(255, 167, 38, 0.7);
+}
+
+.progress-bar-fill[style*="width: 3%"] {
+    background: rgba(255, 167, 38, 0.9);
+}
+
+.progress-bar-fill[style*="width: 4%"] {
+    background: linear-gradient(90deg, #ffa726, #ffb74d);
+}
+
+.progress-bar-fill[style*="width: 5%"] {
+    background: linear-gradient(90deg, #28c76f, #48da89);
+}
+
+.progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #c4c7ff;
+}
+
+.progress-goal {
+    color: #28c76f;
+    font-weight: 600;
+}
+
+/* BMI Progress Bar */
+.bmi-progress-container {
+    width: 100%;
+}
+
+.bmi-progress-bar {
+    width: 100%;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    position: relative;
+    display: flex;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.bmi-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: opacity 0.3s ease;
+}
+
+.bmi-segment[data-range="underweight"] {
+    background: rgba(74, 158, 255, 0.3);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bmi-segment[data-range="normal"] {
+    background: rgba(40, 199, 111, 0.3);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bmi-segment[data-range="overweight"] {
+    background: rgba(255, 167, 38, 0.3);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bmi-segment[data-range="obese"] {
+    background: rgba(255, 82, 82, 0.3);
+}
+
+.bmi-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.bmi-indicator {
+    position: absolute;
+    top: -5px;
+    width: 4px;
+    height: 50px;
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    transition: left 0.5s ease;
+    z-index: 10;
+}
+
+.bmi-indicator::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -6px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #fff;
+}
+
+.bmi-range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #c4c7ff;
+}
+
+/* Home Calendar */
+.home-calendar-wrapper {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    max-width: 1200px;
+    margin: 3rem auto;
+}
+
+/* Quick Stats Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 3rem auto;
+}
+
+.stat-card {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(40, 199, 111, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.stat-card:hover::before {
+    left: 100%;
+}
+
+.stat-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 40px rgba(40, 199, 111, 0.3);
+    border-color: rgba(40, 199, 111, 0.5);
+}
+
+.stat-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #28c76f;
+    margin: 0.5rem 0;
+}
+
+.stat-label {
+    color: #c4c7ff;
+    font-size: 1rem;
+}
+
+/* ===== BMI CALCULATOR ===== */
+.bmi-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 3rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.bmi-container h2 {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #fff, #28c76f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.input-group {
+    margin-bottom: 2rem;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #d0d4ff;
+    font-weight: 500;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #28c76f;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.bmi-result {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(40, 199, 111, 0.1);
+    border-radius: 16px;
+    margin-top: 2rem;
+    border: 2px solid rgba(40, 199, 111, 0.3);
+}
+
+.bmi-value {
+    font-size: 4rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.bmi-category {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.bmi-bar {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.bmi-bar-fill {
+    height: 100%;
+    transition: all 0.5s ease;
+    border-radius: 999px;
+}
+
+.bmi-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    font-size: 0.9rem;
+    color: #c4c7ff;
+}
+
+/* ===== SPORTS SELECTION ===== */
+.sports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+    max-width: 1200px;
+    margin: 2rem auto;
+}
+
+.sport-card {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 0;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.sport-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: linear-gradient(135deg, rgba(40, 199, 111, 0.2), rgba(72, 218, 137, 0.1));
+    transition: all 0.4s ease;
+}
+
+.sport-card:hover {
+    transform: translateY(-12px) scale(1.02);
+    box-shadow: 0 20px 50px rgba(40, 199, 111, 0.4);
+    border-color: rgba(40, 199, 111, 0.6);
+}
+
+.sport-card:hover::before {
+    height: 100%;
+}
+
+.sport-icon {
+    font-size: 5rem;
+    text-align: center;
+    padding: 2rem 0 1rem;
+    position: relative;
+    z-index: 1;
+}
+
+.sport-content {
+    padding: 0 2rem 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.sport-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.sport-difficulty {
+    text-align: center;
+    color: #c4c7ff;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+.sport-badge {
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+}
+
+.badge-play {
+    background: linear-gradient(135deg, #28c76f, #48da89);
+    color: #0b1020;
+}
+
+.badge-soon {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffa726;
+    border: 2px solid rgba(255, 167, 38, 0.3);
+}
+
+/* ===== TABLE TENNIS GAME PAGE ===== */
+.game-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.game-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.game-header h2 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #fff, #ffce54);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.game-layout {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.game-controls {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2rem;
+}
+
+.game-controls h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: #28c76f;
+}
+
+.control-item {
+    margin-bottom: 1.5rem;
+}
+
+.control-item p {
+    color: #d0d4ff;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+.video-preview {
+    margin-top: 1.5rem;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.video-preview video {
+    width: 100%;
+    display: block;
+    filter: saturate(0.2) contrast(1.2) brightness(1.1);
+    transform: scaleX(-1);
+}
+
+.game-canvas-container {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+#gameCanvas {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: radial-gradient(circle at center, #1f2640 0, #050712 100%);
+    border-radius: 12px;
+    border: 2px solid rgba(255, 206, 84, 0.3);
+    box-shadow: 0 10px 40px rgba(255, 206, 84, 0.2);
+}
+
+.game-hint {
+    margin-top: 1.5rem;
+    text-align: center;
+    color: #c4c7ff;
+    font-size: 0.95rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+    .game-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    nav {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .nav-links {
+        gap: 1rem;
+    }
+
+    .hero h1 {
+        font-size: 2.5rem;
+    }
+
+    .stats-grid,
+    .sports-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #gameCanvas {
+        width: 100%;
+        height: auto;
+    }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.text-center {
+    text-align: center;
+}
+
+.mb-2 {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    text-align: center;
+    margin-bottom: 3rem;
+    background: linear-gradient(135deg, #fff, #28c76f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Calendar Styles */
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.calendar-header h3 {
+    font-size: 1.8rem;
+    color: #f5f5f5;
+    margin: 0;
+}
+
+.calendar-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.legend-label {
+    font-size: 0.85rem;
+    color: #c4c7ff;
+}
+
+.legend-colors {
+    display: flex;
+    gap: 3px;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.legend-color:hover {
+    transform: scale(1.2);
+}
+
+.legend-color[data-intensity="0"] {
+    background: rgba(40, 199, 111, 0.1);
+}
+
+.legend-color[data-intensity="1"] {
+    background: rgba(40, 199, 111, 0.3);
+}
+
+.legend-color[data-intensity="2"] {
+    background: rgba(40, 199, 111, 0.5);
+}
+
+.legend-color[data-intensity="3"] {
+    background: rgba(40, 199, 111, 0.7);
+}
+
+.legend-color[data-intensity="4"] {
+    background: rgba(40, 199, 111, 0.9);
+}
+
+.calendar-container {
+    margin-top: 1rem;
+}
+
+.calendar-week-labels {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 0.5rem;
+    align-items: start;
+}
+
+.calendar-heatmap {
+    display: grid;
+    grid-template-columns: repeat(53, 1fr);
+    gap: 4px;
+    padding: 0.5rem 0;
+    width: 100%;
+}
+
+.calendar-day {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.calendar-day:hover {
+    transform: scale(1.3);
+    z-index: 10;
+    box-shadow: 0 0 12px rgba(40, 199, 111, 0.8);
+}
+
+.calendar-day[data-intensity="0"] {
+    background: rgba(40, 199, 111, 0.1);
+}
+
+.calendar-day[data-intensity="1"] {
+    background: rgba(40, 199, 111, 0.3);
+}
+
+.calendar-day[data-intensity="2"] {
+    background: rgba(40, 199, 111, 0.5);
+}
+
+.calendar-day[data-intensity="3"] {
+    background: rgba(40, 199, 111, 0.7);
+}
+
+.calendar-day[data-intensity="4"] {
+    background: rgba(40, 199, 111, 0.9);
+}
+
+.calendar-day.has-activity {
+    border: 1px solid rgba(40, 199, 111, 0.5);
+}
+
+.calendar-month-labels {
+    display: grid;
+    grid-template-columns: repeat(53, 1fr);
+    gap: 4px;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #c4c7ff;
+    padding: 0 0.5rem;
+    height: 20px;
+    position: relative;
+}
+
+.calendar-month-labels span {
+    position: absolute;
+    left: 0;
+}
+
+/* Activity Modal */
+.activity-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 2rem;
+}
+
+.activity-modal.hidden {
+    display: none;
+}
+
+.activity-modal-content {
+    background: linear-gradient(145deg, rgba(22, 27, 47, 0.95), rgba(30, 36, 60, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    max-width: 500px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.activity-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.activity-panel-header h3 {
+    font-size: 1.5rem;
+    color: #f5f5f5;
+    margin: 0;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #c4c7ff;
+    font-size: 2rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f5f5f5;
+    transform: rotate(90deg);
+}
+
+.activity-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.activity-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.25rem;
+    transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(40, 199, 111, 0.3);
+    transform: translateX(5px);
+}
+
+.activity-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.activity-sport {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #28c76f;
+}
+
+.activity-duration {
+    font-size: 0.9rem;
+    color: #c4c7ff;
+}
+
+.activity-calories {
+    font-size: 0.9rem;
+    color: #ffa726;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.activity-notes {
+    font-size: 0.95rem;
+    color: #d0d4ff;
+    line-height: 1.5;
+    margin-top: 0.5rem;
+}
+
+.activity-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #c4c7ff;
+}
+
+@media (max-width: 768px) {
+    .calendar-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .calendar-heatmap {
+        grid-template-columns: repeat(26, 1fr);
+        gap: 3px;
+    }
+
+    .calendar-week-labels {
+        grid-template-columns: 20px 1fr;
+    }
+}
