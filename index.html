@@ -162,10 +162,6 @@
         <div class="sports-grid">
             <!-- Table Tennis Card -->
             <div class="sport-card" data-sport="tennis">
-                <div class="sport-card" data-sport="football">
-<div class="sport-card" data-sport="badminton">
-<div class="sport-card" data-sport="basketball">
-
                 <div class="sport-icon">🏓</div>
                 <div class="sport-content">
                     <div class="sport-title">Table Tennis</div>
@@ -180,7 +176,7 @@
             </div>
 
             <!-- Football Card -->
-            <div class="sport-card">
+            <div class="sport-card" data-sport="football">
                 <div class="sport-icon">⚽</div>
                 <div class="sport-content">
                     <div class="sport-title">Football</div>
@@ -195,7 +191,7 @@
             </div>
 
             <!-- Badminton Card -->
-            <div class="sport-card">
+            <div class="sport-card" data-sport="badminton">
                 <div class="sport-icon">🏸</div>
                 <div class="sport-content">
                     <div class="sport-title">Badminton</div>
@@ -204,7 +200,7 @@
                         Swing your racket using hand gestures. Perfect your smashes and drops!
                     </p>
                     <div style="text-align: center;">
-                        <span class="sport-badge badge-soon">🚀 Coming Soon</span>
+                        <span class="sport-badge badge-play">▶ Play Now</span>
                     </div>
                 </div>
             </div>
@@ -215,8 +211,8 @@
     <section id="game" class="page-section">
         <div class="game-wrapper">
             <div class="game-header">
-                <h2>🏓 Webcam Table Tennis</h2>
-                <p style="color: #d0d4ff; font-size: 1.1rem;">Experience motion-controlled gaming!</p>
+                <h2 id="gameTitle">🏓 Webcam Table Tennis</h2>
+                <p id="gameSubtitle" style="color: #d0d4ff; font-size: 1.1rem;">Experience motion-controlled gaming!</p>
             </div>
 
             <div class="game-layout">
@@ -233,8 +229,8 @@
                         <p><strong>🎮 Step 3:</strong> Your vertical hand movements control your paddle's horizontal position on the table</p>
                     </div>
                     <div class="control-item">
-                        <button id="startButton" class="btn btn-primary" style="width: 100%;">🚀 Start Game (Allow Webcam)</button>
-                        <p id="statusText" style="margin-top: 1rem; text-align: center; color: #c4c7ff;">Click the button to request webcam access.</p>
+                        <button id="startButton" class="btn btn-primary" style="width: 100%;" disabled>⏳ Loading AI Model...</button>
+                        <p id="statusText" style="margin-top: 1rem; text-align: center; color: #c4c7ff;">Please wait while the AI tracking model loads.</p>
                     </div>
                     <div class="video-preview">
                         <video id="video" autoplay playsinline></video>
@@ -265,9 +261,7 @@
         </div>
     </div>
 
-    <!-- Hidden motion detection canvas -->
-    <canvas id="motionCanvas" width="160" height="120" style="display: none"></canvas>
-
-    <script src="script.js"></script>
+    <!-- Scripts -->
+    <script type="module" src="script.js"></script>
 </body>
 </html>

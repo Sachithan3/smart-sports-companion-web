@@ -30,16 +30,21 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 const navLinks = document.querySelectorAll('.nav-link');
+const navbarLinks = document.querySelectorAll('nav .nav-link');
 const sections = document.querySelectorAll('.page-section');
 
 navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
-        const targetId = link.getAttribute('href').substring(1);
+        const targetHref = link.getAttribute('href');
+        if (!targetHref || !targetHref.startsWith('#')) return;
         
-        // Update active states
-        navLinks.forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
+        const targetId = targetHref.substring(1);
+        
+        // Update active states correctly in Navbar
+        navbarLinks.forEach(l => l.classList.remove('active'));
+        const correspondingNav = document.querySelector(`nav .nav-link[href="${targetHref}"]`);
+        if (correspondingNav) correspondingNav.classList.add('active');
         
         // Show target section with smooth transition
         sections.forEach(section => {
@@ -110,61 +115,180 @@ weightInput.addEventListener('input', () => {
 calculateBMI(); // Initial calculation on page load
 
 // ===== SPORTS CARD NAVIGATION =====
-// Make Table Tennis card navigate to game section
-document.querySelector('[data-sport="tennis"]').addEventListener('click', () => {
-    navLinks.forEach(l => l.classList.remove('active'));
-    document.querySelector('[href="#game"]').classList.add('active');
-    sections.forEach(s => s.classList.remove('active'));
-    document.getElementById('game').classList.add('active');
+const gameTitle = document.getElementById("gameTitle");
+const gameSubtitle = document.getElementById("gameSubtitle");
+
+document.querySelectorAll('.sport-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const sport = card.getAttribute('data-sport');
+        if (sport === 'tennis' || sport === 'badminton') {
+            currentSport = sport;
+            
+            if (gameTitle) {
+                gameTitle.textContent = sport === 'tennis' ? '🏓 Webcam Table Tennis' : '🏸 Webcam Badminton';
+            }
+            if (gameSubtitle) {
+                gameSubtitle.textContent = sport === 'tennis' ? 
+                    'Experience motion-controlled table tennis!' : 
+                    'Swing your hand to smash the shuttlecock!';
+            }
+            
+            navbarLinks.forEach(l => l.classList.remove('active'));
+            const gameLink = document.querySelector('nav .nav-link[href="#game"]');
+            if (gameLink) gameLink.classList.add('active');
+            sections.forEach(s => s.classList.remove('active'));
+            document.getElementById('game').classList.add('active');
+            
+            // Sync instantiation synchronously if possible, or gracefully handle it
+            const gameCanvas = document.getElementById("gameCanvas");
+            const ctx = gameCanvas ? gameCanvas.getContext("2d") : null;
+            if (sport === 'badminton' && !badmintonGameInstance && gameCanvas && ctx) {
+                badmintonGameInstance = new BadmintonGame(gameCanvas, ctx);
+            }
+            
+            if (typeof score !== 'undefined') {
+                if (sport === 'tennis') {
+                    score = 0;
+                    if (typeof resetBall === 'function') resetBall(1);
+                }
+            }
+            if (sport === 'badminton' && badmintonGameInstance) {
+                badmintonGameInstance.score = 0;
+                badmintonGameInstance.resetBirdie();
+            }
+            
+            // If already streaming, but the user clicks the card, make sure button is hidden
+            if (hasWebcamStream && startButton) {
+                startButton.style.display = 'none';
+                statusText.textContent = "✅ " + (sport === 'tennis' ? "Webcam Table Tennis Active!" : "Webcam Badminton Active!");
+            }
+        }
+    });
 });
 
-// ===== TABLE TENNIS GAME LOGIC (Original Motion Detection Game) =====
+// ===== GAME LOGIC (MediaPipe Hand Tracking) =====
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js";
+import { BadmintonGame } from "./src/games/badminton.js";
+
+let currentSport = 'tennis';
+let badmintonGameInstance = null;
+let currentLandmarks = null;
+
 const startButton = document.getElementById("startButton");
 const statusText = document.getElementById("statusText");
 const video = document.getElementById("video");
-const motionCanvas = document.getElementById("motionCanvas");
-const motionCtx = motionCanvas.getContext("2d");
 const gameCanvas = document.getElementById("gameCanvas");
 const ctx = gameCanvas.getContext("2d");
 
-let previousFrame = null;
-let detectedY = gameCanvas.height / 2;
-let hasWebcamStream = false;
+let handLandmarker = undefined;
+let webcamRunning = false;
+let lastVideoTime = -1;
 
-// Game constants
+// Game State Variables
+let hasWebcamStream = false;
+let playerTargetY = gameCanvas.height / 2;
+let previousSmoothedY = gameCanvas.height / 2;
+let handVisible = false;
+let lastDetectionY = gameCanvas.height / 2;
+let lastDetectionTimestamp = 0;
+let detectionVelocityY = 0;
+const trackingGraceMs = 140;
+const predictionDamping = 0.88;
+
 const paddleWidth = 12;
 const paddleHeight = 70;
 const ballRadius = 7;
+const maxPaddleSpeedPerFrame = 24;
 
-// Game state variables
 let playerY = gameCanvas.height / 2 - paddleHeight / 2;
+let playerVelocity = 0;
+let playerPaddleVelocity = 0;
 let aiY = gameCanvas.height / 2 - paddleHeight / 2;
-const aiSpeed = 3;
 
 let ballX = gameCanvas.width / 2;
 let ballY = gameCanvas.height / 2;
-let ballSpeedX = 4;
-let ballSpeedY = 2.5;
+let ballSpeedX = 2.6;
+let ballSpeedY = 1.1;
+let ballCurrentSpeed = 2.8;
+const ballBaseSpeed = 2.8;
+const ballAccelerationPerSecond = 0.18;
+const ballMaxSpeed = 11;
+let lastPaddleCollisionMs = 0;
+const paddleCollisionCooldownMs = 55;
+const ballTrail = [];
+const particles = [];
 
-let playerScore = 0;
-let aiScore = 0;
-
+let score = 0;
+let highScore = 0;
 let isRunning = false;
+let lastFrameTime = performance.now();
+let lastAIDecisionTime = performance.now();
+let aiTargetY = aiY + paddleHeight / 2;
+let aiReactionDelayMs = 150;
+const aiDifficulty = {
+    maxSpeed: 6.2,
+    predictionError: 12
+};
+
+let screenShakeAmount = 0;
+let screenShakeDecay = 0.9;
+
+// Initialize MediaPipe
+async function createHandLandmarker() {
+    const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+    );
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+            delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        numHands: 1
+    });
+    
+    // Enable start button
+    if (startButton) {
+        startButton.disabled = false;
+        startButton.textContent = "🚀 Start Game (Allow Webcam)";
+        statusText.textContent = "Click the button to request webcam access.";
+    }
+}
+createHandLandmarker();
 
 // Request webcam access and start video stream
 async function startWebcam() {
     try {
         statusText.textContent = "Requesting webcam access...";
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480 },
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                frameRate: { ideal: 60, max: 60 },
+                facingMode: "user"
+            },
             audio: false,
         });
         video.srcObject = stream;
         hasWebcamStream = true;
-        statusText.textContent = "✅ Webcam started! Move your hand up and down on the LEFT side.";
+        
         video.addEventListener("playing", () => {
-            previousFrame = null;
-            requestAnimationFrame(motionDetectionLoop);
+            if (startButton) startButton.style.display = 'none';
+            statusText.textContent = currentSport === 'tennis' 
+                ? "✅ Webcam started! Raise your hand to play table tennis."
+                : "✅ Webcam started! Raise your hand to play badminton.";
+                
+            if (!isRunning) {
+                isRunning = true;
+                if (currentSport === 'tennis') {
+                    resetBall(1);
+                } else if (currentSport === 'badminton' && badmintonGameInstance) {
+                    badmintonGameInstance.resetBirdie();
+                }
+                lastFrameTime = performance.now();
+                lastAIDecisionTime = lastFrameTime;
+                requestAnimationFrame(gameLoop);
+            }
         });
     } catch (err) {
         console.error("Error accessing webcam:", err);
@@ -172,149 +296,205 @@ async function startWebcam() {
     }
 }
 
-// Detect motion in the left portion of the video feed
-function detectMotionY() {
-    const w = motionCanvas.width;
-    const h = motionCanvas.height;
-    motionCtx.drawImage(video, 0, 0, w, h);
-    const currentFrame = motionCtx.getImageData(0, 0, w, h);
-    
-    if (!previousFrame) {
-        previousFrame = currentFrame;
-        return;
+function spawnParticles(x, y, count = 10) {
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 3 + 1;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            color: Math.random() > 0.5 ? '#ffce54' : '#ffffff'
+        });
     }
-
-    const currentData = currentFrame.data;
-    const prevData = previousFrame.data;
-
-    let sumY = 0;
-    let count = 0;
-    const stripWidth = Math.floor(w * 0.35); // Detect motion only in left 35% of frame
-
-    // Compare current frame with previous frame to detect motion
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < stripWidth; x++) {
-            const index = (y * w + x) * 4;
-            const brightnessNow = (currentData[index] + currentData[index + 1] + currentData[index + 2]) / 3;
-            const brightnessPrev = (prevData[index] + prevData[index + 1] + prevData[index + 2]) / 3;
-            const diff = Math.abs(brightnessNow - brightnessPrev);
-            
-            // If significant change detected, track this pixel's Y position
-            if (diff > 25) {
-                sumY += y;
-                count++;
-            }
-        }
-    }
-
-    // Calculate average Y position of motion and smooth the movement
-    if (count > 50) {
-        const averageY = sumY / count;
-        const scaleY = gameCanvas.height / h;
-        const targetY = averageY * scaleY;
-        const smoothing = 0.2;
-        detectedY = detectedY + (targetY - detectedY) * smoothing;
-    }
-
-    previousFrame = currentFrame;
 }
 
-// Continuous loop for motion detection
-function motionDetectionLoop() {
-    if (hasWebcamStream) {
-        detectMotionY();
-        playerY = detectedY - paddleHeight / 2;
-        // Keep paddle within canvas bounds
-        playerY = Math.max(0, Math.min(gameCanvas.height - paddleHeight, playerY));
+function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.05;
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        }
     }
-    requestAnimationFrame(motionDetectionLoop);
 }
 
 // Reset ball position after scoring
 function resetBall(directionX = 1) {
     ballX = gameCanvas.width / 2;
     ballY = gameCanvas.height / 2;
-    ballSpeedX = 4 * directionX;
-    ballSpeedY = (Math.random() * 3 + 2) * (Math.random() < 0.5 ? 1 : -1);
+    ballCurrentSpeed = ballBaseSpeed;
+    const launchAngle = (Math.random() * 0.55 - 0.275);
+    ballSpeedX = Math.cos(launchAngle) * ballCurrentSpeed * directionX;
+    ballSpeedY = Math.sin(launchAngle) * ballCurrentSpeed;
+    lastPaddleCollisionMs = 0;
+    ballTrail.length = 0;
 }
 
-// AI paddle follows the ball
-function updateAI() {
-    const paddleCenter = aiY + paddleHeight / 2;
-    if (ballY < paddleCenter - 10) {
-        aiY -= aiSpeed;
-    } else if (ballY > paddleCenter + 10) {
-        aiY += aiSpeed;
+function normalizeBallSpeed(targetSpeed) {
+    const totalSpeed = Math.hypot(ballSpeedX, ballSpeedY) || 1;
+    const scale = targetSpeed / totalSpeed;
+    ballSpeedX *= scale;
+    ballSpeedY *= scale;
+}
+
+function updatePlayerPaddle(dt) {
+    if (!hasWebcamStream) return;
+
+    // Limit paddle travel per frame to avoid teleports on detection reacquire.
+    const targetTop = Math.max(0, Math.min(gameCanvas.height - paddleHeight, playerTargetY - paddleHeight / 2));
+    const delta = targetTop - playerY;
+
+    const responsiveness = handVisible ? 0.62 : 0.35;
+    let desiredStep = delta * responsiveness;
+    const maxStep = maxPaddleSpeedPerFrame * dt * (handVisible ? 1.35 : 1.0);
+    desiredStep = Math.max(-maxStep, Math.min(maxStep, desiredStep));
+
+    playerY += desiredStep;
+    
+    playerY = Math.max(0, Math.min(gameCanvas.height - paddleHeight, playerY));
+    playerPaddleVelocity = desiredStep;
+}
+
+// AI paddle with reaction delay, prediction error and speed cap
+function updateAI(dt, nowMs) {
+    if (nowMs - lastAIDecisionTime >= aiReactionDelayMs) {
+        let projectedY = ballY;
+        if (ballSpeedX > 0) {
+            const distanceToAI = (gameCanvas.width - paddleWidth - ballRadius) - ballX;
+            const framesToReach = Math.max(0, distanceToAI / Math.max(0.001, ballSpeedX));
+            projectedY += ballSpeedY * Math.min(framesToReach, 45);
+        }
+
+        const error = (Math.random() * 2 - 1) * aiDifficulty.predictionError;
+        projectedY += error;
+        aiTargetY = Math.max(paddleHeight / 2, Math.min(gameCanvas.height - paddleHeight / 2, projectedY));
+        aiReactionDelayMs = 100 + Math.random() * 100;
+        lastAIDecisionTime = nowMs;
     }
+
+    const aiCenter = aiY + paddleHeight / 2;
+    const delta = aiTargetY - aiCenter;
+    const maxStep = aiDifficulty.maxSpeed * dt;
+    aiY += Math.max(-maxStep, Math.min(maxStep, delta));
     aiY = Math.max(0, Math.min(gameCanvas.height - paddleHeight, aiY));
 }
 
-// Update ball position and handle collisions
-function updateBall() {
-    ballX += ballSpeedX;
-    ballY += ballSpeedY;
+function applyPaddleCollision(isPlayer, nowMs) {
+    const paddleTop = isPlayer ? playerY : aiY;
+    const paddleCenter = paddleTop + paddleHeight / 2;
+    const hit = (ballY - paddleCenter) / (paddleHeight / 2);
+    const clampedHit = Math.max(-1, Math.min(1, hit));
+    const paddleVelocity = isPlayer ? playerPaddleVelocity : 0;
 
-    // Top wall collision
-    if (ballY - ballRadius < 0 && ballSpeedY < 0) {
-        ballY = ballRadius;
-        ballSpeedY *= -1;
+    ballSpeedY += clampedHit * 4;
+    ballSpeedY += paddleVelocity * 0.3;
+    ballSpeedY += (Math.random() * 2 - 1) * 0.18;
+    ballSpeedX *= -1.05;
+
+    ballCurrentSpeed = Math.min(ballMaxSpeed, Math.max(ballBaseSpeed, Math.hypot(ballSpeedX, ballSpeedY)));
+    normalizeBallSpeed(ballCurrentSpeed);
+
+    if (isPlayer) {
+        ballX = paddleWidth + ballRadius + 0.5;
+        score++;
+        highScore = Math.max(highScore, score);
+    } else {
+        ballX = gameCanvas.width - paddleWidth - ballRadius - 0.5;
     }
 
-    // Bottom wall collision
-    if (ballY + ballRadius > gameCanvas.height && ballSpeedY > 0) {
-        ballY = gameCanvas.height - ballRadius;
-        ballSpeedY *= -1;
+    lastPaddleCollisionMs = nowMs;
+    screenShakeAmount = 4;
+    
+    spawnParticles(ballX, ballY, 15);
+}
+
+function ballIntersectsPaddle(isPlayer) {
+    const paddleTop = isPlayer ? playerY : aiY;
+    const paddleLeft = isPlayer ? 0 : gameCanvas.width - paddleWidth;
+    const paddleRight = paddleLeft + paddleWidth;
+    const withinY = ballY + ballRadius >= paddleTop && ballY - ballRadius <= paddleTop + paddleHeight;
+    const withinX = ballX + ballRadius >= paddleLeft && ballX - ballRadius <= paddleRight;
+    return withinX && withinY;
+}
+
+// Update ball position with acceleration, cooldown collision and anti-tunneling
+function updateBall(dt, nowMs) {
+    ballCurrentSpeed = Math.min(ballMaxSpeed, ballCurrentSpeed + ballAccelerationPerSecond * dt);
+    normalizeBallSpeed(ballCurrentSpeed);
+
+    const steps = Math.max(1, Math.ceil(Math.hypot(ballSpeedX, ballSpeedY) * dt / (ballRadius * 0.7)));
+    const stepDt = dt / steps;
+    const canCollideWithPaddle = nowMs - lastPaddleCollisionMs > paddleCollisionCooldownMs;
+
+    for (let step = 0; step < steps; step++) {
+        ballX += ballSpeedX * stepDt;
+        ballY += ballSpeedY * stepDt;
+
+        if (ballY - ballRadius < 0 && ballSpeedY < 0) {
+            ballY = ballRadius;
+            ballSpeedY *= -1;
+            ballSpeedY *= 1 + (Math.random() * 0.1 - 0.05);
+            normalizeBallSpeed(ballCurrentSpeed);
+            spawnParticles(ballX, ballY, 5);
+        }
+
+        if (ballY + ballRadius > gameCanvas.height && ballSpeedY > 0) {
+            ballY = gameCanvas.height - ballRadius;
+            ballSpeedY *= -1;
+            ballSpeedY *= 1 + (Math.random() * 0.1 - 0.05);
+            normalizeBallSpeed(ballCurrentSpeed);
+            spawnParticles(ballX, ballY, 5);
+        }
+
+        if (canCollideWithPaddle && ballSpeedX < 0 && ballIntersectsPaddle(true)) {
+            applyPaddleCollision(true, nowMs);
+            break;
+        }
+
+        if (canCollideWithPaddle && ballSpeedX > 0 && ballIntersectsPaddle(false)) {
+            applyPaddleCollision(false, nowMs);
+            break;
+        }
     }
 
-    // Player paddle collision
-    if (
-        ballX - ballRadius < paddleWidth &&
-        ballY > playerY &&
-        ballY < playerY + paddleHeight &&
-        ballSpeedX < 0
-    ) {
-        ballX = paddleWidth + ballRadius;
-        ballSpeedX *= -1;
-        const hitPos = ballY - (playerY + paddleHeight / 2);
-        ballSpeedY += hitPos * 0.05; // Add spin based on where ball hits paddle
-    }
-
-    // AI paddle collision
-    const rightPaddleX = gameCanvas.width - paddleWidth;
-    if (
-        ballX + ballRadius > rightPaddleX &&
-        ballY > aiY &&
-        ballY < aiY + paddleHeight &&
-        ballSpeedX > 0
-    ) {
-        ballX = rightPaddleX - ballRadius;
-        ballSpeedX *= -1;
-        const hitPos = ballY - (aiY + paddleHeight / 2);
-        ballSpeedY += hitPos * 0.05;
-    }
-
-    // Scoring - ball went past player paddle
     if (ballX < 0) {
-        aiScore++;
+        score = 0;
+        screenShakeAmount = 8;
         resetBall(1);
     }
 
-    // Scoring - ball went past AI paddle
     if (ballX > gameCanvas.width) {
-        playerScore++;
+        screenShakeAmount = 8;
         resetBall(-1);
+    }
+
+    ballTrail.push({ x: ballX, y: ballY, life: 1 });
+    if (ballTrail.length > 10) {
+        ballTrail.shift();
+    }
+    for (let i = 0; i < ballTrail.length; i++) {
+        ballTrail[i].life *= 0.84;
     }
 }
 
 // Draw the game scene
 function drawGame() {
+    screenShakeAmount *= screenShakeDecay;
+    const shakeX = screenShakeAmount > 0.1 ? (Math.random() * 2 - 1) * screenShakeAmount : 0;
+    const shakeY = screenShakeAmount > 0.1 ? (Math.random() * 2 - 1) * screenShakeAmount : 0;
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
     ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
 
-    // Semi-transparent overlay for trail effect
     ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
     ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
 
-    // Center line
     ctx.strokeStyle = "#3e4370";
     ctx.setLineDash([8, 12]);
     ctx.beginPath();
@@ -323,54 +503,129 @@ function drawGame() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw paddles
+    for (const p of particles) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Draw Paddles
     ctx.fillStyle = "#f5f5f5";
+    if (hasWebcamStream && handLandmarker) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#4a9eff";
+    }
     ctx.fillRect(0, playerY, paddleWidth, paddleHeight);
+    
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#f5f5f5";
     ctx.fillRect(gameCanvas.width - paddleWidth, aiY, paddleWidth, paddleHeight);
 
-    // Draw ball
+    for (let i = 0; i < ballTrail.length; i++) {
+        const t = ballTrail[i];
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, ballRadius * (0.45 + t.life * 0.35), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 206, 84, ${t.life * 0.22})`;
+        ctx.fill();
+    }
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#ffce54";
     ctx.beginPath();
     ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
     ctx.fillStyle = "#ffce54";
     ctx.fill();
+    ctx.shadowBlur = 0;
 
-    // Draw scores
     ctx.fillStyle = "#ffffff";
-    ctx.font = "20px system-ui, sans-serif";
+    ctx.font = "bold 24px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(playerScore.toString(), gameCanvas.width / 4, 30);
-    ctx.fillText(aiScore.toString(), (gameCanvas.width * 3) / 4, 30);
+    ctx.fillText(score.toString(), gameCanvas.width / 4, 35);
+    ctx.fillText(highScore.toString(), (gameCanvas.width * 3) / 4, 35);
 
-    // Draw player labels
     ctx.font = "11px system-ui, sans-serif";
     ctx.fillStyle = "#c4c7ff";
-    ctx.fillText("YOU", gameCanvas.width / 4, 48);
-    ctx.fillText("CPU", (gameCanvas.width * 3) / 4, 48);
+    ctx.fillText("SCORE", gameCanvas.width / 4, 52);
+    ctx.fillText("HIGH", (gameCanvas.width * 3) / 4, 52);
+    ctx.restore();
 }
 
 // Main game loop
-function gameLoop() {
+async function gameLoop(timestamp) {
     if (!isRunning) return;
-    updateAI();
-    updateBall();
-    drawGame();
+
+    let gotFreshDetection = false;
+
+    if (handLandmarker && video.readyState >= 2) {
+        if (lastVideoTime !== video.currentTime) {
+            lastVideoTime = video.currentTime;
+            const results = handLandmarker.detectForVideo(video, performance.now());
+            if (results.landmarks && results.landmarks.length > 0) {
+                currentLandmarks = results.landmarks;
+                const indexFingerTip = results.landmarks[0][8];
+                const wrist = results.landmarks[0][0];
+                const rawY = ((indexFingerTip.y * 0.65) + (wrist.y * 0.35)) * gameCanvas.height;
+
+                if (lastDetectionTimestamp > 0) {
+                    const framesElapsed = Math.max(1, (timestamp - lastDetectionTimestamp) / 16.67);
+                    const instantVelocity = (rawY - lastDetectionY) / framesElapsed;
+                    detectionVelocityY = detectionVelocityY * 0.55 + instantVelocity * 0.45;
+                }
+
+                playerTargetY = rawY;
+                lastDetectionY = rawY;
+                lastDetectionTimestamp = timestamp;
+                handVisible = true;
+                gotFreshDetection = true;
+            }
+        }
+    }
+
+    if (!gotFreshDetection) {
+        const msSinceDetection = lastDetectionTimestamp > 0 ? (timestamp - lastDetectionTimestamp) : Number.POSITIVE_INFINITY;
+
+        if (msSinceDetection <= trackingGraceMs) {
+            const framesSinceDetection = msSinceDetection / 16.67;
+            const dampedVelocity = detectionVelocityY * Math.pow(predictionDamping, framesSinceDetection);
+            playerTargetY = lastDetectionY + dampedVelocity * framesSinceDetection;
+            playerTargetY = Math.max(0, Math.min(gameCanvas.height, playerTargetY));
+            handVisible = true;
+        } else {
+            handVisible = false;
+            detectionVelocityY *= 0.85;
+            currentLandmarks = null;
+        }
+    }
+
+    const dtMs = timestamp - lastFrameTime;
+    const dt = Math.min(2.4, Math.max(0.5, dtMs / 16.67));
+    lastFrameTime = timestamp;
+
+    if (currentSport === 'tennis') {
+        updatePlayerPaddle(dt);
+        updateAI(dt, timestamp);
+        updateBall(dt, timestamp);
+        updateParticles();
+        drawGame();
+    } else if (currentSport === 'badminton' && badmintonGameInstance) {
+        badmintonGameInstance.update(currentLandmarks, dtMs, timestamp);
+        badmintonGameInstance.draw();
+    }
+    
     requestAnimationFrame(gameLoop);
 }
 
-// Start button event listener
-startButton.addEventListener("click", async () => {
-    if (!hasWebcamStream) {
-        await startWebcam();
-    }
-    if (!isRunning && hasWebcamStream) {
-        isRunning = true;
-        statusText.textContent = "🎮 Game running! Wave your hand up and down on the LEFT side of the camera.";
-        resetBall(1);
-        gameLoop();
-    }
-});
+if (startButton) {
+    startButton.addEventListener("click", async () => {
+        if (!hasWebcamStream) {
+            await startWebcam();
+        }
+    });
+}
 
-// Draw initial game state
 drawGame();
 
 // ===== HOME DASHBOARD - ACTIVITY CALENDAR =====
