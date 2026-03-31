@@ -7,11 +7,11 @@ export class Badminton3D {
         // Game Constants - Badminton Scale
         this.COURT = { width: 6.1, length: 13.4, height: 0 };
         this.NET = { height: 1.55, thickness: 0.02 };
-        this.SHUTTLE = { radius: 0.08, mass: 0.005 }; // Massively visible shuttle
-        this.RACKET = { radius: 0.12, thickness: 0.02, handleLength: 0.6 }; // Scaled down to fit tightly in view
+        this.SHUTTLE = { radius: 0.10, mass: 0.005 }; 
+        this.RACKET = { radius: 0.30, thickness: 0.02, handleLength: 0.6 }; // Massively scaled up mesh and frame to virtually guarantee hit logic
         
         this.PHYSICS = {
-            gravity: -8.0,      // Heavier gravity for parabolic arcs
+            gravity: -8.0,      // Restored strong gravity for a true parabolic arc
             airResistance: 0.995,
             racketRestitution: 1.25
         };
@@ -38,6 +38,7 @@ export class Badminton3D {
         this.racketVelocity = new THREE.Vector3();
         this.prevRacketPosition = new THREE.Vector3(0, 2.0, 6.0);
         this.racketTarget = new THREE.Vector3(0, 2.0, 6.0);
+        this.prevShuttlePosition = new THREE.Vector3();
 
         this.initScene();
     }
@@ -169,8 +170,9 @@ export class Badminton3D {
         group.add(racketFrame);
         
         // Strings
-        const stringGeo = new THREE.CylinderGeometry(this.RACKET.radius, this.RACKET.radius, 0.005, 32);
-        const stringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
+        // Matched to frame's total radius + 0.01 so it reaches directly into the tube for a seamless visual size
+        const stringGeo = new THREE.CylinderGeometry(this.RACKET.radius + 0.01, this.RACKET.radius + 0.01, 0.005, 32);
+        const stringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false }); // depthWrite: false stops the temporary disappearance bug caused by transparent Z-fighting against the net!
         const strings = new THREE.Mesh(stringGeo, stringMat);
         strings.rotation.x = Math.PI / 2;
         group.add(strings);
@@ -180,7 +182,12 @@ export class Badminton3D {
 
     createRackets() {
         this.playerRacket = this.createRacketMesh(0x3498db); // Blue
+        this.playerRacket.visible = false; // Set invisible: pure tracking hitbox
         this.scene.add(this.playerRacket);
+        
+        // NEW: visual-only racket decoupled from hard tracking snaps
+        this.playerRacketVisual = this.createRacketMesh(0x3498db);
+        this.scene.add(this.playerRacketVisual);
         
         this.aiRacket = this.createRacketMesh(0xe74c3c); // Red
         this.scene.add(this.aiRacket);
@@ -195,8 +202,8 @@ export class Badminton3D {
     }
 
     serveShuttle() {
-        // Positively flying towards the player player at Z=6.0, reaching the camera
-        this.shuttleVelocity.set((Math.random() - 0.5) * 2.0, 3.5, 13.0);
+        // Reduced initial Y-arc to stay on screen, Z-speed restored to classic parameter
+        this.shuttleVelocity.set((Math.random() - 0.5) * 1.5, 5.0, 11.5);
         this.gameState = 'playing';
         this.lastHitter = 'ai'; // AI serves to player
     }
@@ -228,32 +235,69 @@ export class Badminton3D {
             const wrist = hand[0];
             const palm = hand[9];
             
-            // Advanced mapping using true Z-depth derived from wrist vs palm relationships
-            const x = THREE.MathUtils.clamp((0.5 - tip.x) * 10.0, -this.COURT.width/2.5, this.COURT.width/2.5);
-            const anchorY = (tip.y * 0.6) + (wrist.y * 0.4);
-            const y = THREE.MathUtils.clamp(0.2 + (1 - anchorY) * 2.5, 0.2, 2.2); // Lowered vertical view
-            
-            // Evaluate Z depth depth difference
-            const depthDiff = (wrist.z || 0) - (palm.z || 0);
-            const z = THREE.MathUtils.clamp(6.0 + (depthDiff * 25.0), 3.5, 6.5); // Stops right before camera
-            
-            this.racketTarget.set(x, y, z);
-            
-            // Smooth lerp instead of jittery pos injection
-            const alpha = Math.min(1, (dtMs / 16.67) * 0.35);
-            this.playerRacket.position.lerp(this.racketTarget, alpha);
-            
-            // True velocity
-            this.racketVelocity.copy(this.playerRacket.position).sub(this.prevRacketPosition).multiplyScalar(1000 / Math.max(1, dtMs));
-            this.prevRacketPosition.copy(this.playerRacket.position);
-            
-            // Visual dynamic tilt
-            if (this.racketVelocity.lengthSq() > 0.01) {
-                const tilt = THREE.MathUtils.clamp(this.racketVelocity.y / 15, -0.6, 0.6);
-                const yaw = -THREE.MathUtils.clamp(this.racketVelocity.x / 15, -0.6, 0.6);
-                this.playerRacket.rotation.set(tilt, yaw, 0);
+            if (!tip || !wrist || !palm) {
+                // Keep previous target instead of freezing
+                this.racketTarget.copy(this.playerRacket.position);
+            } else {
+                // Advanced mapping using true Z-depth derived from wrist vs palm relationships
+                const x = THREE.MathUtils.clamp((0.5 - tip.x) * 10.0, -this.COURT.width/2.5, this.COURT.width/2.5);
+                const anchorY = (tip.y * 0.6) + (wrist.y * 0.4);
+                const y = THREE.MathUtils.clamp(0.2 + (1 - anchorY) * 2.5, 0.2, 2.2); // Lowered vertical view
+                
+                // Stabilize Z-Depth mapping to prevent huge jumps
+                const depthDiff = (wrist.z || 0) - (palm.z || 0);
+                const z = THREE.MathUtils.clamp(6.0 + (depthDiff * 10.0), 4.0, 6.5);
+                
+                this.racketTarget.set(x, y, z);
             }
+        } else {
+            // Keep previous target instead of freezing perfectly
+            this.racketTarget.copy(this.playerRacket.position);
         }
+        
+        // Compute hand velocity
+        const handDelta = this.racketTarget.clone().sub(this.prevRacketPosition);
+
+        // Predict next position (lead the motion slightly)
+        const prediction = handDelta.multiplyScalar(0.6);
+
+        // Final target with prediction
+        const predictedTarget = this.racketTarget.clone().add(prediction);
+        
+        // Clamp Instead of Freezing on Large Movement
+        const maxStep = 2.5; // max movement per frame
+        const step = predictedTarget.clone().sub(this.playerRacket.position);
+
+        if (step.length() > maxStep) {
+            step.normalize().multiplyScalar(maxStep);
+            this.playerRacket.position.add(step);
+        } else {
+            // Smooth but fast follow tracking
+            this.playerRacket.position.lerp(predictedTarget, 0.75);
+        }
+        
+        // Prevent Camera Escape
+        this.playerRacket.position.z = THREE.MathUtils.clamp(
+            this.playerRacket.position.z,
+            3.5,
+            6.5
+        );
+        
+        // True velocity
+        this.racketVelocity.copy(this.playerRacket.position).sub(this.prevRacketPosition).multiplyScalar(1000 / Math.max(1, dtMs));
+        this.prevRacketPosition.copy(this.playerRacket.position);
+        
+        // Visual dynamic tilt
+        if (this.racketVelocity.lengthSq() > 0.01) {
+            const tilt = THREE.MathUtils.clamp(this.racketVelocity.y / 15, -0.6, 0.6);
+            const yaw = -THREE.MathUtils.clamp(this.racketVelocity.x / 15, -0.6, 0.6);
+            this.playerRacket.rotation.set(tilt, yaw, 0);
+        }
+        
+        // Smooth visual racket locally (does NOT affect rigid hit detection)
+        this.playerRacketVisual.position.lerp(this.playerRacket.position, 0.2);
+        this.playerRacketVisual.rotation.x += (this.playerRacket.rotation.x - this.playerRacketVisual.rotation.x) * 0.2;
+        this.playerRacketVisual.rotation.y += (this.playerRacket.rotation.y - this.playerRacketVisual.rotation.y) * 0.2;
 
         // AI Racket Logic
         const diff = this.DIFFICULTY[this.difficulty];
@@ -268,9 +312,33 @@ export class Badminton3D {
             // Simulate gravity for Y
             let targetY = this.shuttle.position.y + (this.shuttleVelocity.y * flightTime) + (0.5 * this.PHYSICS.gravity * flightTime * flightTime);
             
-            targetX += (Math.random() - 0.5) * diff.errorMargin;
-            targetY = Math.max(0.2, Math.min(2.5, targetY)); // Bound AI height heavily downward
-            targetX = Math.max(-this.COURT.width/2, Math.min(this.COURT.width/2, targetX));
+            // Dynamic rally continuation probability
+            const baseChance = 0.7; // 70% initial
+            const decay = 0.2;      // drop per rally
+            const continueChance = Math.max(0.2, baseChance - (this.rallyCount * decay));
+            
+            // We use fixed scalars per-rally so the AI racket doesn't jitter from randomizing every frame
+            const seed = (this.scorePlayer * 7 + this.scoreAI * 13 + this.rallyCount * 17) % 100;
+            const willMiss = (seed / 100.0) > continueChance; 
+            
+            if (willMiss) {
+                // Delay AI response slightly
+                if (Math.random() < 0.5) {
+                    return; // skip this frame → late movement
+                }
+                
+                // Subtle error instead of obvious fake miss
+                targetX += (Math.random() - 0.5) * 1.5; // slight misalignment
+                
+                // Slightly wrong height → mistimed hit
+                targetY += (Math.random() - 0.5) * 1.0;
+            } else {
+                targetX += (seed % 5 - 2) * 0.1; // Normal variance
+            }
+            
+            // Allow AI to reach higher up (was 2.5 previously causing overhead misses)
+            targetY = Math.max(0.5, Math.min(4.5, targetY)); 
+            targetX = Math.max(-this.COURT.width/2 - 2, Math.min(this.COURT.width/2 + 2, targetX));
             
             this.aiTarget.set(targetX, targetY, targetZ);
         } else {
@@ -284,6 +352,9 @@ export class Badminton3D {
 
     updateShuttle(dt) {
         if (this.gameState !== 'playing') return;
+        
+        // Cache previous position for CCD (Continuous Collision Detection)
+        this.prevShuttlePosition.copy(this.shuttle.position);
         
         // Apply physics
         this.shuttleVelocity.y += this.PHYSICS.gravity * dt;
@@ -300,6 +371,33 @@ export class Badminton3D {
             this.shuttle.rotateX(-Math.PI/2); // Adjust so skirt points backwards
         }
         
+        // NET COLLISION (CCD Lite)
+        const netTop = this.NET.height;
+        const netZ = 0;
+        
+        // Check if shuttle crossed the net plane exactly rather than just overlapping Z bounds loosely
+        const crossedNet = (this.prevShuttlePosition.z > netZ && this.shuttle.position.z <= netZ) || (this.prevShuttlePosition.z < netZ && this.shuttle.position.z >= netZ);
+
+        if (crossedNet && this.shuttle.position.y < netTop) {
+            // Snap shuttle to net plane (prevents visual pass-through)
+            this.shuttle.position.z = netZ;
+            // Add slight bounce instead of dead drop
+            this.shuttleVelocity.z *= -0.2;
+            this.shuttleVelocity.y *= 0.5;
+            // Add tiny backward offset (prevents z-fighting against the net mesh visual)
+            this.shuttle.position.z += (this.lastHitter === 'player' ? 0.02 : -0.02);
+        }
+
+        // Z boundary clamp / bounce
+        if (Math.abs(this.shuttle.position.z) > this.COURT.length / 2 + 1.0) {
+            this.shuttle.position.z = THREE.MathUtils.clamp(
+                this.shuttle.position.z,
+                -this.COURT.length / 2 - 1.0,
+                this.COURT.length / 2 + 1.0
+            );
+            this.shuttleVelocity.z *= -1; // bounce back into play
+        }
+
         // Check hits ground
         if (this.shuttle.position.y < this.SHUTTLE.radius) {
             // Determine who scored based on Z position
@@ -324,15 +422,14 @@ export class Badminton3D {
     }
 
     checkRacketCollision(racket, hitter, nowMs) {
-        if (this.lastHitter === hitter && this.shuttleVelocity.z * (hitter === 'player' ? -1 : 1) > 0) {
-           return;
-        }
+        const isApproaching = (hitter === 'player' && this.shuttleVelocity.z > 0) || (hitter === 'ai' && this.shuttleVelocity.z < 0);
+        if (!isApproaching) return;
         
         if (nowMs - this.lastHitTime < this.cooldownMs) return;
         
         const delta = this.shuttle.pos ? this.shuttle.pos.clone().sub(racket.position) : this.shuttle.position.clone().sub(racket.position);
         const distance = delta.length();
-        const collisionDist = this.SHUTTLE.radius + this.RACKET.radius + 0.1; // generous sweet spot
+        const collisionDist = this.SHUTTLE.radius + this.RACKET.radius + 0.40; // Massive 0.40 margin of error sweet spot
         
         if (distance < collisionDist) {
             this.lastHitTime = nowMs;
@@ -344,16 +441,44 @@ export class Badminton3D {
                 const intentionalSwing = racketSpeed > 1.5 || this.racketVelocity.y > 1.5;
                 if (!intentionalSwing && this.shuttleVelocity.z <= 0) return;
                 
-                let power = 15.0; // Consistently reach backcourt
+                const impactBoost = Math.min(3.0, racketSpeed);
                 
-                this.shuttleVelocity.x = (this.racketVelocity.x * 0.2) + (outward.x * 2.5);
-                this.shuttleVelocity.y = 3.5 + (this.racketVelocity.y * 0.1) + Math.max(0, outward.y) * 2.5;
-                this.shuttleVelocity.z = -power; 
+                this.shuttleVelocity.x = (this.racketVelocity.x * 0.15);
+                this.shuttleVelocity.y = 4.8 + Math.max(0, outward.y) * 1.2 + (impactBoost * 0.3);
+                this.shuttleVelocity.z = -11.5 - impactBoost; 
+                
+                const netChance = Math.random();
+                if (netChance < 0.10) {
+                    this.shuttleVelocity.y *= 0.6; // 10% chance to hit net
+                }
             } else {
-                let power = 15.0;
-                this.shuttleVelocity.x = (Math.random() - 0.5) * 3.0 + (outward.x * 1.5);
-                this.shuttleVelocity.y = 4.0 + (Math.random() * 1.5) + Math.max(0, outward.y) * 2.0;
-                this.shuttleVelocity.z = power; 
+                this.shuttleVelocity.x = (Math.random() - 0.5) * 1.5;
+                this.shuttleVelocity.y = 4.8 + Math.random() * 0.8;
+                this.shuttleVelocity.z = 11.5;
+                
+                // Re-evaluate global miss probability based on current rally
+                const seed = (this.scorePlayer * 7 + this.scoreAI * 13 + this.rallyCount * 17) % 100;
+                const baseChance = 0.7;
+                const decay = 0.2;
+                const continueChance = Math.max(0.2, baseChance - (this.rallyCount * decay));
+                const willMiss = (seed / 100.0) > continueChance; 
+                
+                if (willMiss && Math.random() < 0.4) {
+                    // Weak return → easy for player
+                    this.shuttleVelocity.y *= 0.6;
+                    this.shuttleVelocity.z *= 0.7;
+                } else {
+                    const minClearHeight = this.NET.height + 0.2;
+                    if (this.shuttle.position.y < minClearHeight) {
+                        this.shuttleVelocity.y += 2.0; // force lift
+                    }
+                }
+                
+                const netChance = Math.random();
+                if (netChance < 0.10) {
+                    // AI makes mistake → hits net
+                    this.shuttleVelocity.y = 2.5; // too low → net collision likely
+                }
             }
             
             this.lastHitter = hitter;
