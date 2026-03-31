@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <section id="game" class="page-section active">
+        <div class="game-wrapper">
+            <div class="game-layout">
+                <div class="game-canvas-container">
+                    <canvas id="gameCanvas" width="640" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+  <script type="module">
+    import { TableTennisGame3D } from "./src/games/tableTennis3d.js";
+    const canvas = document.getElementById("gameCanvas");
+    const game = new TableTennisGame3D(canvas);
+    
+    function loop(time) {
+      game.update(null, 16, time);
+      game.draw();
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

@@ -1,341 +1,274 @@
-// src/games/badminton.js
+import * as THREE from "https://unpkg.com/three@0.165.0/build/three.module.js";
 
 export class BadmintonGame {
-    constructor(canvas, ctx) {
+    constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = ctx;
-        
-        // Game state
+
         this.score = 0;
         this.highScore = 0;
-        this.gravity = 1400; // pixels per second squared
-        this.drag = 0.992; // Air resistance on velocity
-        this.cooldownMs = 450;
         this.lastHitTime = 0;
-        this.particles = [];
-        this.screenShakeAmount = 0;
-        this.screenShakeAmount = 0;
+        this.cooldownMs = 120;
 
-        // Racket state
-        this.racket = {
-            x: this.canvas.width / 2,
-            y: this.canvas.height / 2,
-            radius: 65, // Base Hitbox size - slightly larger for forgiveness
-            vx: 0,
-            vy: 0,
-            history: [] // Last few positions to calculate swing velocity
-        };
-        
-        // Birdie state
-        this.birdie = {
-            x: this.canvas.width / 2,
-            y: 50,
-            vx: 0,
-            vy: 0,
-            radius: 8,
-            rotation: 0
+        this.racketVelocity = new THREE.Vector3();
+        this.prevRacketPosition = new THREE.Vector3();
+        this.racketTarget = new THREE.Vector3(0, 0.95, 1.85);
+        this.handVisible = false;
+
+        this.shuttle = {
+            pos: new THREE.Vector3(0, 1.6, 0.4),
+            vel: new THREE.Vector3(0.3, -0.45, -0.6),
+            radius: 0.06
         };
 
+        this.gravity = 5.8;
+        this.drag = 0.62;
+        this.sideLimit = 2.25;
+        this.backLimit = 3.25;
+
+        this.init3D();
         this.resetBirdie();
     }
 
+    init3D() {
+        const initialWidth = this.canvas.clientWidth || this.canvas.width || 640;
+        const initialHeight = this.canvas.clientHeight || this.canvas.height || 400;
+
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x07131d);
+        this.scene.fog = new THREE.Fog(0x07131d, 8, 22);
+
+        this.camera = new THREE.PerspectiveCamera(
+            56,
+            initialWidth / initialHeight,
+            0.1,
+            100
+        );
+        this.camera.position.set(0, 1.9, 5.8);
+        this.camera.lookAt(0, 1.0, 0);
+
+        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: false });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.renderer.setSize(initialWidth, initialHeight, false);
+        this.renderer.setClearColor(0x07131d, 1);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        this.scene.add(new THREE.AmbientLight(0x99accf, 0.45));
+
+        const key = new THREE.DirectionalLight(0xffffff, 1.1);
+        key.position.set(3.4, 6, 3.2);
+        key.castShadow = true;
+        key.shadow.mapSize.set(1024, 1024);
+        key.shadow.camera.left = -6;
+        key.shadow.camera.right = 6;
+        key.shadow.camera.top = 6;
+        key.shadow.camera.bottom = -6;
+        this.scene.add(key);
+
+        const fill = new THREE.PointLight(0x5fb2ff, 0.45, 16);
+        fill.position.set(-2.5, 2.4, 2.3);
+        this.scene.add(fill);
+
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(24, 24),
+            new THREE.MeshStandardMaterial({ color: 0x173a28, roughness: 0.93, metalness: 0.04 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        floor.receiveShadow = true;
+        this.scene.add(floor);
+
+        const courtLineMat = new THREE.MeshStandardMaterial({ color: 0xf4f6fa });
+        const courtOutline = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 8.5), new THREE.MeshStandardMaterial({ color: 0x1f6d40 }));
+        courtOutline.rotation.x = -Math.PI / 2;
+        courtOutline.position.y = 0.001;
+        this.scene.add(courtOutline);
+
+        const sidelineL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.01, 8.5), courtLineMat);
+        sidelineL.position.set(-2.4, 0.01, 0);
+        const sidelineR = sidelineL.clone();
+        sidelineR.position.x = 2.4;
+        const baselineNear = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.01, 0.05), courtLineMat);
+        baselineNear.position.set(0, 0.01, 4.25);
+        const baselineFar = baselineNear.clone();
+        baselineFar.position.z = -4.25;
+        const centerLine = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.01, 8.5), courtLineMat);
+        centerLine.position.set(0, 0.01, 0);
+        this.scene.add(sidelineL, sidelineR, baselineNear, baselineFar, centerLine);
+
+        const net = new THREE.Mesh(
+            new THREE.BoxGeometry(4.9, 0.85, 0.03),
+            new THREE.MeshStandardMaterial({ color: 0xe7ecf7, roughness: 0.78 })
+        );
+        net.position.set(0, 0.45, 0);
+        net.castShadow = true;
+        this.scene.add(net);
+
+        this.racket = this.createRacket();
+        this.racket.position.set(0, 1, 1.8);
+        this.scene.add(this.racket);
+
+        this.shuttleGroup = this.createShuttle();
+        this.shuttleGroup.castShadow = true;
+        this.scene.add(this.shuttleGroup);
+    }
+
+    createRacket() {
+        const group = new THREE.Group();
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.2, 0.015, 12, 36),
+            new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.38 })
+        );
+        ring.rotation.x = Math.PI / 2;
+        ring.castShadow = true;
+        group.add(ring);
+
+        const handle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.025, 0.025, 0.45, 12),
+            new THREE.MeshStandardMaterial({ color: 0x2a2f35, roughness: 0.8 })
+        );
+        handle.position.set(0, -0.25, 0);
+        handle.castShadow = true;
+        group.add(handle);
+        return group;
+    }
+
+    createShuttle() {
+        const group = new THREE.Group();
+        const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(0.08, 0.16, 18),
+            new THREE.MeshStandardMaterial({ color: 0xf7f9fc, roughness: 0.74 })
+        );
+        cone.rotation.x = Math.PI;
+        cone.position.y = 0.03;
+        group.add(cone);
+
+        const cork = new THREE.Mesh(
+            new THREE.SphereGeometry(0.045, 18, 18),
+            new THREE.MeshStandardMaterial({ color: 0xe0b85f, roughness: 0.6 })
+        );
+        cork.position.y = -0.07;
+        group.add(cork);
+        return group;
+    }
+
     resetBirdie() {
-        this.birdie.x = this.canvas.width / 2;
-        this.birdie.y = 50;
-        // Launch it slightly upward to give player time
-        this.birdie.vx = (Math.random() * 300) - 150;
-        this.birdie.vy = -(Math.random() * 200 + 100);
+        this.shuttle.pos.set((Math.random() - 0.5) * 1.4, 1.8, -1.4 + Math.random() * 1.0);
+        this.shuttle.vel.set((Math.random() - 0.5) * 0.9, -0.55, 1.4 + Math.random() * 0.6);
     }
 
-    updateRacket(handX, handY, dtMs) {
-        const now = performance.now();
-        this.racket.history.push({ x: handX, y: handY, time: now });
-        
-        // Keep a short history for velocity calculation (~100ms window)
-        while (this.racket.history.length > 0 && now - this.racket.history[0].time > 100) {
-            this.racket.history.shift();
+    updateRacketFromHand(landmarks, dtMs) {
+        if (!landmarks || landmarks.length === 0) {
+            this.handVisible = false;
+            return;
         }
 
-        if (this.racket.history.length >= 2) {
-            const oldest = this.racket.history[0];
-            const newest = this.racket.history[this.racket.history.length - 1];
-            const timeDiff = (newest.time - oldest.time) / 1000; // in seconds
-            
-            if (timeDiff > 0.01) {
-                // Smooth exponential moving average for velocity to avoid noise spikes
-                const rawVx = (newest.x - oldest.x) / timeDiff;
-                const rawVy = (newest.y - oldest.y) / timeDiff;
-                
-                this.racket.vx = this.racket.vx * 0.4 + rawVx * 0.6;
-                this.racket.vy = this.racket.vy * 0.4 + rawVy * 0.6;
-            }
-        } else {
-            this.racket.vx = 0;
-            this.racket.vy = 0;
-        }
+        const hand = landmarks[0];
+        const tip = hand[8];
+        const wrist = hand[0];
+        const palm = hand[9];
 
-        // Apply position with a light EMA for smoothness
-        this.racket.x = this.racket.x * 0.3 + handX * 0.7;
-        this.racket.y = this.racket.y * 0.3 + handY * 0.7;
+        const x = THREE.MathUtils.clamp((0.5 - tip.x) * 4.2, -2.1, 2.1);
+        const y = THREE.MathUtils.clamp(0.25 + (0.75 - ((tip.y * 0.7) + (wrist.y * 0.3))) * 2.6, 0.35, 2.3);
+        const z = THREE.MathUtils.clamp(2.1 + ((wrist.z ?? 0) - (palm.z ?? 0)) * 6.8, 1.1, 2.9);
+
+        this.racketTarget.set(x, y, z);
+        const alpha = Math.min(1, (dtMs / 16.67) * 0.34);
+        this.racket.position.lerp(this.racketTarget, alpha);
+
+        this.racketVelocity.copy(this.racket.position).sub(this.prevRacketPosition).multiplyScalar(1000 / Math.max(1, dtMs));
+        this.prevRacketPosition.copy(this.racket.position);
+
+        const velLen = this.racketVelocity.length();
+        if (velLen > 0.001) {
+            const tilt = THREE.MathUtils.clamp(this.racketVelocity.y / 1200, -0.35, 0.35);
+            const yaw = THREE.MathUtils.clamp(this.racketVelocity.x / 1200, -0.35, 0.35);
+            this.racket.rotation.set(Math.PI / 2 + tilt, yaw, 0);
+        }
+        this.handVisible = true;
     }
 
-    update(landmarks, dtMs, nowMs) {
-        const dt = dtMs / 1000; // converted to seconds
+    checkHit(nowMs) {
+        if (nowMs - this.lastHitTime < this.cooldownMs) return;
 
-        // Update Racket Position
-        if (landmarks && landmarks.length > 0) {
-            // Index finger tip is landmark 8
-            const handTip = landmarks[0][8];
-            // X is mirrored in the camera view usually, but assuming the base game handles mirroring outside or we do it here.
-            // Our existing game canvas doesn't flip, MediaPipe returns mirrored coords if camera is mirrored.
-            // We just map cleanly to canvas width/height.
-            // Since it's a front-facing camera, we might want to invert X for natural movement.
-            const handX = (1 - handTip.x) * this.canvas.width;
-            const handY = handTip.y * this.canvas.height;
-            
-            this.updateRacket(handX, handY, dtMs);
+        const delta = this.shuttle.pos.clone().sub(this.racket.position);
+        const dist = delta.length();
+        const racketSpeed = this.racketVelocity.length();
+
+        if (dist > 0.3) return;
+
+        const intentionalSwing = racketSpeed > 430 || this.racketVelocity.y > 250;
+        if (!intentionalSwing && this.shuttle.vel.y <= 0) return;
+
+        this.score += 1;
+        this.highScore = Math.max(this.highScore, this.score);
+        this.lastHitTime = nowMs;
+
+        const outward = delta.normalize();
+        const base = 2.1;
+        this.shuttle.vel.x = this.racketVelocity.x * 0.0026 + outward.x * base * 0.7;
+        this.shuttle.vel.y = 1.9 + this.racketVelocity.y * 0.0028 + Math.max(0, outward.y) * 0.8;
+        this.shuttle.vel.z = -1.8 + this.racketVelocity.z * 0.0024 - outward.z * 0.8;
+
+        const max = 5.4;
+        const speed = this.shuttle.vel.length();
+        if (speed > max) {
+            this.shuttle.vel.multiplyScalar(max / speed);
+        }
+    }
+
+    updatePhysics(dt) {
+        const speed = this.shuttle.vel.length();
+        if (speed > 0) {
+            const dragForce = this.drag * speed * speed;
+            const dragVec = this.shuttle.vel.clone().normalize().multiplyScalar(-dragForce * dt * 0.08);
+            this.shuttle.vel.add(dragVec);
         }
 
-        // Apply Physics to Birdie
-        this.birdie.vy += this.gravity * dt;
-        
-        // Air resistance (drag)
-        this.birdie.vx *= Math.pow(this.drag, dtMs);
-        this.birdie.vy *= Math.pow(this.drag, dtMs);
+        this.shuttle.vel.y -= this.gravity * dt;
+        this.shuttle.pos.addScaledVector(this.shuttle.vel, dt);
 
-        this.birdie.x += this.birdie.vx * dt;
-        this.birdie.y += this.birdie.vy * dt;
-
-        // Wall collisions
-        if (this.birdie.x < this.birdie.radius) {
-            this.birdie.x = this.birdie.radius;
-            this.birdie.vx *= -0.6; // bounce and lose momentum
-        } else if (this.birdie.x > this.canvas.width - this.birdie.radius) {
-            this.birdie.x = this.canvas.width - this.birdie.radius;
-            this.birdie.vx *= -0.6;
+        if (this.shuttle.pos.x < -this.sideLimit || this.shuttle.pos.x > this.sideLimit) {
+            this.shuttle.pos.x = THREE.MathUtils.clamp(this.shuttle.pos.x, -this.sideLimit, this.sideLimit);
+            this.shuttle.vel.x *= -0.58;
         }
 
-        // Ceiling collision (bounce down)
-        if (this.birdie.y < this.birdie.radius) {
-            this.birdie.y = this.birdie.radius;
-            this.birdie.vy = Math.abs(this.birdie.vy) * 0.5;
+        if (this.shuttle.pos.z < -this.backLimit || this.shuttle.pos.z > this.backLimit) {
+            this.shuttle.pos.z = THREE.MathUtils.clamp(this.shuttle.pos.z, -this.backLimit, this.backLimit);
+            this.shuttle.vel.z *= -0.5;
         }
 
-        // Ground collision -> Game Over / Drop
-        if (this.birdie.y > this.canvas.height) {
-            if (this.score > this.highScore) {
-                this.highScore = this.score;
-            }
+        if (this.shuttle.pos.y < this.shuttle.radius) {
+            this.shuttle.pos.y = this.shuttle.radius;
             this.score = 0;
-            this.screenShakeAmount = 10;
-            this.spawnParticles(this.birdie.x, this.canvas.height, 20, '#e74c3c');
             this.resetBirdie();
         }
 
-        this.checkSwingCollision(nowMs);
-        this.updateParticles();
+        this.shuttleGroup.position.copy(this.shuttle.pos);
+        this.shuttleGroup.lookAt(this.shuttle.pos.clone().add(this.shuttle.vel));
     }
 
-    checkSwingCollision(nowMs) {
-        const dx = this.birdie.x - this.racket.x;
-        const dy = this.birdie.y - this.racket.y;
-        const distance = Math.hypot(dx, dy);
-
-        const speed = Math.hypot(this.racket.vx, this.racket.vy);
-        
-        // If hand is moving very fast, artificially expand the hitbox to account for skipped frames
-        const dynamicRadius = this.racket.radius + (speed > 500 ? 40 : 0);
-
-        // Collision check
-        if (distance < dynamicRadius + this.birdie.radius) {
-            if (nowMs - this.lastHitTime > this.cooldownMs) {
-                const swingThreshold = 400; // px/s
-
-                if (speed > swingThreshold) {
-                    this.registerHit(nowMs, true);
-                } else if (this.racket.vy < -100) {
-                    // A slow upward tap
-                    this.registerHit(nowMs, false);
-                } else if (this.birdie.vy > 0) {
-                     // Birdie is falling on the racket, just pop it up slightly
-                     this.birdie.vy = -400;
-                     this.birdie.vx += (Math.random() - 0.5) * 100;
-                     this.lastHitTime = nowMs;
-                     this.score++;
-                }
-            }
-        }
-    }
-
-    registerHit(nowMs, isHardSwing) {
-        this.score++;
-        this.lastHitTime = nowMs;
-        
-        const elasticity = 0.85; // How much of our hand's velocity goes into the birdie
-        
-        // Transfer velocity
-        let hitVx = this.racket.vx * elasticity;
-        let hitVy = this.racket.vy * elasticity;
-        
-        // Ensure a minimum upward trajectory so it doesn't spike down immediately
-        if (hitVy > -300) {
-            hitVy -= 400; // Add an upward pop
-        }
-        
-        // Cap max vertical velocity
-        hitVy = Math.max(hitVy, -1200); 
-
-        // Apply new velocities
-        this.birdie.vx = hitVx + (this.birdie.vx * -0.2); // Counter a bit of the incoming speed
-        this.birdie.vy = hitVy;
-
-        this.screenShakeAmount = isHardSwing ? 6 : 2;
-        this.spawnParticles(this.birdie.x, this.birdie.y, isHardSwing ? 15 : 5, '#ecf0f1');
-    }
-
-    spawnParticles(x, y, count, color) {
-        for (let i = 0; i < count; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 4 + 1;
-            this.particles.push({
-                x, y,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                life: 1.0,
-                color: Math.random() > 0.5 ? color : '#ffffff'
-            });
-        }
-    }
-
-    updateParticles() {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles.length ? this.particles[i] : null;
-            if(!p) continue;
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life -= 0.03;
-            if (p.life <= 0) {
-                this.particles.splice(i, 1);
-            }
-        }
+    update(landmarks, dtMs, nowMs) {
+        const dt = Math.min(0.04, dtMs / 1000);
+        this.updateRacketFromHand(landmarks, dtMs);
+        this.checkHit(nowMs);
+        this.updatePhysics(dt);
     }
 
     draw() {
-        // Screen shake
-        this.screenShakeAmount *= 0.9;
-        const shakeX = this.screenShakeAmount > 0.5 ? (Math.random() * 2 - 1) * this.screenShakeAmount : 0;
-        const shakeY = this.screenShakeAmount > 0.5 ? (Math.random() * 2 - 1) * this.screenShakeAmount : 0;
-
-        this.ctx.save();
-        this.ctx.translate(shakeX, shakeY);
-
-        // Background / Court
-        this.ctx.fillStyle = "#27ae60"; // Green court
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Court lines
-        this.ctx.strokeStyle = "rgba(255,255,255,0.4)";
-        this.ctx.lineWidth = 4;
-        this.ctx.strokeRect(40, 40, this.canvas.width - 80, this.canvas.height - 80);
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.canvas.width / 2, 40);
-        this.ctx.lineTo(this.canvas.width / 2, this.canvas.height - 40);
-        this.ctx.stroke();
-
-        // Draw Score
-        this.ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
-        this.ctx.font = "bold 140px system-ui";
-        this.ctx.textAlign = "center";
-        this.ctx.textBaseline = "middle";
-        this.ctx.fillText(this.score.toString(), this.canvas.width / 2, this.canvas.height / 2);
-        
-        // Draw High Score
-        if (this.highScore > 0) {
-            this.ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-            this.ctx.font = "bold 24px system-ui";
-            this.ctx.fillText("HIGH SCORE: " + this.highScore, this.canvas.width / 2, this.canvas.height / 2 + 100);
+        const width = this.canvas.clientWidth || this.canvas.width;
+        const height = this.canvas.clientHeight || this.canvas.height;
+        if (this.canvas.width !== width || this.canvas.height !== height) {
+            this.renderer.setSize(width, height, false);
+            this.camera.aspect = width / height;
+            this.camera.updateProjectionMatrix();
         }
+        this.renderer.render(this.scene, this.camera);
+    }
 
-        // Draw Particles
-        for (const p of this.particles) {
-            this.ctx.globalAlpha = p.life;
-            this.ctx.fillStyle = p.color;
-            this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-            this.ctx.fill();
+    destroy() {
+        if (this.renderer) {
+            this.renderer.dispose();
         }
-        this.ctx.globalAlpha = 1.0;
-
-        // Draw Racket (Badminton style)
-        // Draw Handle
-        let angle = Math.atan2(this.racket.vy, this.racket.vx);
-        if (Math.hypot(this.racket.vx, this.racket.vy) < 50) angle = -Math.PI / 2; // Point UP by default
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.racket.x - Math.cos(angle)*30, this.racket.y - Math.sin(angle)*30);
-        this.ctx.lineTo(this.racket.x - Math.cos(angle)*100, this.racket.y - Math.sin(angle)*100);
-        this.ctx.strokeStyle = "#2c3e50"; // Dark handle
-        this.ctx.lineWidth = 10;
-        this.ctx.lineCap = "round";
-        this.ctx.stroke();
-
-        this.ctx.beginPath();
-        this.ctx.ellipse(this.racket.x, this.racket.y, this.racket.radius, this.racket.radius * 1.3, angle, 0, Math.PI * 2);
-        this.ctx.strokeStyle = "#ecf0f1";
-        this.ctx.lineWidth = 6;
-        this.ctx.stroke();
-        
-        // Racket strings (simple hash)
-        this.ctx.save();
-        this.ctx.translate(this.racket.x, this.racket.y);
-        this.ctx.rotate(angle);
-        this.ctx.beginPath();
-        for(let i=-20; i<=20; i+=10) {
-            this.ctx.moveTo(i, -30);
-            this.ctx.lineTo(i, 30);
-            this.ctx.moveTo(-30, i);
-            this.ctx.lineTo(30, i);
-        }
-        this.ctx.strokeStyle = "rgba(255,255,255,0.4)";
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-        this.ctx.restore();
-
-
-        // Draw Birdie
-        // The birdie orientation follows its velocity direction
-        const birdieAngle = Math.atan2(this.birdie.vy, this.birdie.vx);
-        this.ctx.save();
-        this.ctx.translate(this.birdie.x, this.birdie.y);
-        this.ctx.rotate(birdieAngle);
-
-        // Feathers (triangle shape trailing behind velocity vector)
-        this.ctx.beginPath();
-        this.ctx.moveTo(5, 0); // nose point
-        this.ctx.lineTo(-20, -12); // top feather edge
-        this.ctx.lineTo(-20, 12); // bottom feather edge
-        this.ctx.closePath();
-        this.ctx.fillStyle = "#ecf0f1";
-        this.ctx.fill();
-        this.ctx.strokeStyle = "#bdc3c7";
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-
-        // Feather lines
-        this.ctx.beginPath();
-        this.ctx.moveTo(0, 0);
-        this.ctx.lineTo(-20, -6);
-        this.ctx.moveTo(0, 0);
-        this.ctx.lineTo(-20, 6);
-        this.ctx.stroke();
-
-        // Cork (rounded nose pointing in velocity direction)
-        this.ctx.beginPath();
-        this.ctx.arc(4, 0, this.birdie.radius, -Math.PI/2, Math.PI/2);
-        this.ctx.fillStyle = "#f1c40f"; // Yellow cork
-        this.ctx.fill();
-
-        this.ctx.restore();
-        this.ctx.restore();
     }
 }
