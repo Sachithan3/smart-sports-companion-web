@@ -7,11 +7,27 @@ export class TableTennisGame3D {
         this.highScore = 0;
         this.lastHitTime = 0;
         this.hitCooldownMs = 80;
+        this.rallyResetDelayMs = 900;
+        this.pendingServeAt = 0;
+        this.nextServeDirection = 1;
+        this.isRallyLive = true;
+        this.ballTravelSpeed = 1.45;
+        this.bounceZBySide = { player: 0.62, ai: -0.62 };
+        this.ballY = 0.12;
+        this.playerPaddleZ = 0.78;
+        this.aiPaddleZ = -0.78;
+        this.playerHitAssistX = 0.48;
+        this.paddlePlaneCaptureZ = 0.35;
+        this.maxBallSpeed = 2.1;
+        this.ballSpeedGainPerHit = 0.02;
+        this.missMargin = 0.22;
+        this.phase = "to_player_bounce";
 
         this.playerTarget = new THREE.Vector3(0, 0, 1.65);
         this.playerVelocity = new THREE.Vector3();
         this.previousPlayerPos = new THREE.Vector3();
         this.handVisible = false;
+        this.previousBallPos = new THREE.Vector3();
 
         this.ball = {
             pos: new THREE.Vector3(0, 0.2, 0),
@@ -96,11 +112,11 @@ export class TableTennisGame3D {
         this.scene.add(net);
 
         this.playerPaddle = this.createPaddle(0x45a0ff);
-        this.playerPaddle.position.set(0, 0.3, 1.65);
+        this.playerPaddle.position.set(0, 0.3, this.playerPaddleZ);
         this.scene.add(this.playerPaddle);
 
         this.aiPaddle = this.createPaddle(0xff6f61);
-        this.aiPaddle.position.set(0, 0.3, -1.65);
+        this.aiPaddle.position.set(0, 0.3, this.aiPaddleZ);
         this.scene.add(this.aiPaddle);
 
         const ballMat = new THREE.MeshStandardMaterial({
@@ -136,16 +152,36 @@ export class TableTennisGame3D {
     }
 
     resetBall(direction = 1) {
-        this.ball.pos.set(0, 0.35, 0);
+        this.ball.pos.set(0, this.ballY, 0);
         const launchYaw = (Math.random() - 0.5) * 0.4;
-        this.ball.vel.set(
-            Math.sin(launchYaw) * 2.1,
-            (Math.random() - 0.45) * 0.8,
-            1.8 * direction
-        );
+        this.ball.vel.set(Math.sin(launchYaw) * (this.ballTravelSpeed * 0.25), 0, this.ballTravelSpeed * direction);
+        this.isRallyLive = true;
+        this.pendingServeAt = 0;
+        this.nextServeDirection = direction;
+        this.previousBallPos.copy(this.ball.pos);
+        this.phase = direction > 0 ? "to_player_bounce" : "to_ai_bounce";
     }
 
-    updatePlayerFromHand(landmarks, dtMs) {
+    handleRallyMiss(direction, nowMs) {
+        if (!this.isRallyLive) {
+            return;
+        }
+        this.isRallyLive = false;
+        this.score = 0;
+        this.pendingServeAt = nowMs + this.rallyResetDelayMs;
+        this.nextServeDirection = direction;
+    }
+
+    setDirectionTowardPlayer() {
+        this.ball.vel.z = Math.abs(this.ballTravelSpeed);
+    }
+
+    setDirectionTowardAi() {
+        this.ball.vel.z = -Math.abs(this.ballTravelSpeed);
+    }
+
+    updatePlayerFromHand(landmarksInput, dtMs) {
+        const landmarks = Array.isArray(landmarksInput) ? landmarksInput : landmarksInput?.hands;
         if (!landmarks || landmarks.length === 0) {
             this.handVisible = false;
             return;
@@ -158,7 +194,7 @@ export class TableTennisGame3D {
 
         const x = THREE.MathUtils.clamp((0.5 - tip.x) * 2.2, -1.25, 1.25);
         const y = THREE.MathUtils.clamp(0.2 + (0.65 - ((tip.y * 0.7) + (wrist.y * 0.3))) * 1.8, 0.15, 1.05);
-        const zRaw = THREE.MathUtils.clamp(1.82 + ((wrist.z ?? 0) - (palm.z ?? 0)) * 4.0, 1.35, 2.05);
+        const zRaw = THREE.MathUtils.clamp(this.playerPaddleZ + ((wrist.z ?? 0) - (palm.z ?? 0)) * 0.12, this.playerPaddleZ - 0.04, this.playerPaddleZ + 0.06);
 
         this.playerTarget.set(x, y, zRaw);
         const smoothing = Math.min(1, (dtMs / 16.67) * 0.36);
@@ -176,67 +212,94 @@ export class TableTennisGame3D {
         this.aiPaddle.position.y = THREE.MathUtils.lerp(this.aiPaddle.position.y, targetY, dt * 2.0);
     }
 
-    handlePaddleCollision(paddle, isPlayer, nowMs) {
+    handlePlayerPaddleCollision(nowMs, prevBallPos) {
         if (nowMs - this.lastHitTime < this.hitCooldownMs) {
             return false;
         }
-
-        const delta = this.ball.pos.clone().sub(paddle.position);
-        const closeInZ = Math.abs(delta.z) < 0.19;
-        const radial = Math.hypot(delta.x, delta.y);
-        if (!closeInZ || radial > 0.27) {
+        if (this.phase !== "to_player_paddle") {
+            return false;
+        }
+        if (this.ball.vel.z <= 0) {
             return false;
         }
 
-        this.ball.vel.z *= -1;
-        this.ball.vel.z += isPlayer ? -0.15 : 0.15;
-        this.ball.vel.x += delta.x * 1.4;
-        this.ball.vel.y += delta.y * 1.1;
-
-        if (isPlayer) {
-            this.ball.vel.x += this.playerVelocity.x * 0.0018;
-            this.ball.vel.y += this.playerVelocity.y * 0.0018;
-            this.ball.vel.z += this.playerVelocity.z * 0.0014;
-            this.score += 1;
-            this.highScore = Math.max(this.highScore, this.score);
+        const paddle = this.playerPaddle;
+        const currentZDiff = this.ball.pos.z - this.playerPaddleZ;
+        const prevZDiff = prevBallPos.z - this.playerPaddleZ;
+        const crossedPaddlePlane = (prevZDiff <= 0 && currentZDiff >= 0) || (prevZDiff >= 0 && currentZDiff <= 0);
+        const inRangeNow = Math.abs(currentZDiff) < this.paddlePlaneCaptureZ;
+        if (!crossedPaddlePlane && !inRangeNow) {
+            return false;
         }
 
-        const maxSpeed = 4.2;
-        const speed = this.ball.vel.length();
-        if (speed > maxSpeed) {
-            this.ball.vel.multiplyScalar(maxSpeed / speed);
+        const denom = prevZDiff - currentZDiff;
+        const t = Math.abs(denom) < 1e-6 ? 1 : THREE.MathUtils.clamp(prevZDiff / denom, 0, 1);
+        const hitX = THREE.MathUtils.lerp(prevBallPos.x, this.ball.pos.x, t);
+        const dx = hitX - paddle.position.x;
+        if (Math.abs(dx) > this.playerHitAssistX) {
+            return false;
         }
 
+        this.ball.pos.x = THREE.MathUtils.clamp(hitX, -this.tableWidth / 2 + this.ball.radius, this.tableWidth / 2 - this.ball.radius);
+        this.ball.pos.y = this.ballY;
+        this.ball.pos.z = this.playerPaddleZ - (this.ball.radius + 0.02);
+        this.ballTravelSpeed = Math.min(this.maxBallSpeed, this.ballTravelSpeed + this.ballSpeedGainPerHit);
+        this.setDirectionTowardAi();
+        this.ball.vel.x = THREE.MathUtils.clamp(dx * 1.0 + this.playerVelocity.x * 0.0008, -0.85, 0.85);
+        this.phase = "to_ai_bounce";
+
+        this.score += 1;
+        this.highScore = Math.max(this.highScore, this.score);
         this.lastHitTime = nowMs;
         return true;
     }
 
+    opponentReturn() {
+        this.ball.pos.z = this.aiPaddleZ + this.ball.radius + 0.02;
+        this.setDirectionTowardPlayer();
+        const tableHalfW = this.tableWidth / 2 - this.ball.radius;
+        const desiredBounceX = THREE.MathUtils.clamp(this.playerPaddle.position.x + (Math.random() - 0.5) * 0.28, -tableHalfW, tableHalfW);
+        const dzToBounce = Math.max(0.001, this.bounceZBySide.player - this.ball.pos.z);
+        const travelTime = dzToBounce / Math.abs(this.ball.vel.z);
+        const requiredVx = (desiredBounceX - this.ball.pos.x) / travelTime;
+        this.ball.vel.x = THREE.MathUtils.clamp(requiredVx, -0.55, 0.55);
+        this.phase = "to_player_bounce";
+    }
+
     updateBall(dt, nowMs) {
-        this.ball.vel.y -= 2.35 * dt;
+        this.previousBallPos.copy(this.ball.pos);
+        this.ball.vel.y = 0;
         this.ball.pos.addScaledVector(this.ball.vel, dt);
+        this.ball.pos.y = this.ballY;
 
-        if (this.ball.pos.x < -this.tableWidth / 2 + this.ball.radius || this.ball.pos.x > this.tableWidth / 2 - this.ball.radius) {
-            this.ball.pos.x = THREE.MathUtils.clamp(this.ball.pos.x, -this.tableWidth / 2 + this.ball.radius, this.tableWidth / 2 - this.ball.radius);
-            this.ball.vel.x *= -0.88;
+        const tableHalfW = this.tableWidth / 2 - this.ball.radius;
+        if (this.ball.pos.x < -tableHalfW || this.ball.pos.x > tableHalfW) {
+            this.ball.pos.x = THREE.MathUtils.clamp(this.ball.pos.x, -tableHalfW, tableHalfW);
+            this.ball.vel.x *= -1;
         }
 
-        if (this.ball.pos.y < this.tableHeight + this.ball.radius) {
-            this.ball.pos.y = this.tableHeight + this.ball.radius;
-            this.ball.vel.y = Math.abs(this.ball.vel.y) * 0.82;
-            this.ball.vel.x *= 0.98;
-            this.ball.vel.z *= 0.98;
+        if (!this.isRallyLive) {
+            if (this.pendingServeAt > 0 && nowMs >= this.pendingServeAt) {
+                this.resetBall(this.nextServeDirection ?? 1);
+            }
+            this.ballMesh.position.copy(this.ball.pos);
+            return;
         }
 
-        this.handlePaddleCollision(this.playerPaddle, true, nowMs);
-        this.handlePaddleCollision(this.aiPaddle, false, nowMs);
-
-        if (this.ball.pos.z > this.tableDepth / 2 + 0.55) {
-            this.score = 0;
-            this.resetBall(-1);
+        if (this.phase === "to_ai_bounce" && this.ball.pos.z <= this.bounceZBySide.ai) {
+            this.ball.pos.z = this.bounceZBySide.ai;
+            this.phase = "to_ai_paddle";
+        } else if (this.phase === "to_ai_paddle" && this.ball.pos.z <= this.aiPaddleZ + this.ball.radius + 0.02) {
+            this.opponentReturn();
+        } else if (this.phase === "to_player_bounce" && this.ball.pos.z >= this.bounceZBySide.player) {
+            this.ball.pos.z = this.bounceZBySide.player;
+            this.phase = "to_player_paddle";
         }
 
-        if (this.ball.pos.z < -this.tableDepth / 2 - 0.55) {
-            this.resetBall(1);
+        this.handlePlayerPaddleCollision(nowMs, this.previousBallPos);
+
+        if (this.phase === "to_player_paddle" && this.ball.pos.z > this.playerPaddleZ + this.missMargin) {
+            this.handleRallyMiss(-1, nowMs);
         }
 
         this.ballMesh.position.copy(this.ball.pos);

@@ -157,7 +157,8 @@ export class BadmintonGame {
         this.shuttle.vel.set((Math.random() - 0.5) * 0.9, -0.55, 1.4 + Math.random() * 0.6);
     }
 
-    updateRacketFromHand(landmarks, dtMs) {
+    updateRacketFromHand(landmarksInput, dtMs) {
+        const landmarks = Array.isArray(landmarksInput) ? landmarksInput : landmarksInput?.hands;
         if (!landmarks || landmarks.length === 0) {
             this.handVisible = false;
             return;

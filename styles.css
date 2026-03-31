@@ -619,7 +619,7 @@ nav {
 
 .game-layout {
     display: grid;
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: minmax(250px, 0.55fr) minmax(680px, 1.45fr);
     gap: 2rem;
     align-items: start;
 }
@@ -628,7 +628,7 @@ nav {
     background: linear-gradient(145deg, rgba(22, 27, 47, 0.9), rgba(30, 36, 60, 0.8));
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
-    padding: 2rem;
+    padding: 1.25rem;
 }
 
 .game-controls h3 {
@@ -648,16 +648,26 @@ nav {
 }
 
 .video-preview {
-    margin-top: 1.5rem;
+    margin-top: 1rem;
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    max-width: 260px;
 }
 
 .video-preview video {
     width: 100%;
     display: block;
     filter: saturate(0.2) contrast(1.2) brightness(1.1);
+}
+
+#trackingOverlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
 .game-canvas-container {
@@ -668,6 +678,40 @@ nav {
     display: flex;
     flex-direction: column;
     align-items: center;
+    min-height: 640px;
+}
+
+.game-scoreboard {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.score-item {
+    min-width: 140px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(7, 12, 24, 0.5);
+    text-align: center;
+}
+
+.score-label {
+    display: block;
+    color: #c4c7ff;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.score-value {
+    display: block;
+    margin-top: 0.2rem;
+    color: #ffce54;
+    font-weight: 700;
+    font-size: 1.45rem;
 }
 
 #gameCanvas {
@@ -675,6 +719,9 @@ nav {
     border-radius: 12px;
     border: 2px solid rgba(255, 206, 84, 0.3);
     box-shadow: 0 10px 40px rgba(255, 206, 84, 0.2);
+    width: min(78vw, 1080px);
+    height: auto;
+    aspect-ratio: 16 / 9;
 }
 
 .game-hint {

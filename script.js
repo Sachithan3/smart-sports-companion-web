@@ -2,7 +2,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const sportImages = {
         tennis: "images/table-tennis.png",
-        football: "images/football.png",
+        boxing: "images/table-tennis.png",
         badminton: "images/badminton.png",
         basketball: "images/basketball.png"
     };
@@ -133,17 +133,25 @@ const gameHint = document.querySelector(".game-hint");
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js";
 import { TableTennisGame3D } from "./src/games/tableTennis3d.js";
 import { BadmintonGame } from "./src/games/badminton.js";
+import { Badminton3D } from "./src/games/badminton3D.js";
+import { BoxingGame } from "./src/games/boxing.js";
 
 let currentSport = 'tennis';
 let tennisGame3DInstance = null;
 let badmintonGameInstance = null;
+let badminton3DInstance = null;
+let boxingGameInstance = null;
 let activeGameInstance = null;
-let currentLandmarks = null;
+let currentTracking = { hands: null };
 
 const startButton = document.getElementById("startButton");
 const statusText = document.getElementById("statusText");
 const video = document.getElementById("video");
+const trackingOverlay = document.getElementById("trackingOverlay");
 const gameCanvas = document.getElementById("gameCanvas");
+const rallyScoreEl = document.getElementById("rallyScore");
+const highScoreEl = document.getElementById("highScore");
+const missCountEl = document.getElementById("missCount");
 
 let handLandmarker = undefined;
 let lastVideoTime = -1;
@@ -171,9 +179,13 @@ function createActiveGameForSport(sport) {
     if (sport === 'tennis') {
         tennisGame3DInstance = new TableTennisGame3D(gameCanvas);
         activeGameInstance = tennisGame3DInstance;
-    } else {
-        badmintonGameInstance = new BadmintonGame(gameCanvas);
-        activeGameInstance = badmintonGameInstance;
+    } else if (sport === 'badminton') {
+        badminton3DInstance = new Badminton3D(gameCanvas);
+        badmintonGameInstance = badminton3DInstance;
+        activeGameInstance = badminton3DInstance;
+    } else if (sport === 'boxing') {
+        boxingGameInstance = new BoxingGame(gameCanvas);
+        activeGameInstance = boxingGameInstance;
     }
 }
 
@@ -183,8 +195,15 @@ function resetCurrentGame() {
         tennisGame3DInstance.resetBall(1);
     } else if (currentSport === 'badminton' && badmintonGameInstance) {
         badmintonGameInstance.score = 0;
-        badmintonGameInstance.resetBirdie();
+        if (typeof badmintonGameInstance.startGame === 'function') {
+            badmintonGameInstance.startGame();
+        } else if (typeof badmintonGameInstance.resetBirdie === 'function') {
+            badmintonGameInstance.resetBirdie();
+        }
+    } else if (currentSport === 'boxing' && boxingGameInstance) {
+        boxingGameInstance.resetRound();
     }
+    updateScoreboard();
 }
 
 function isGameSectionActive() {
@@ -193,7 +212,7 @@ function isGameSectionActive() {
 }
 
 // Initialize MediaPipe
-async function createHandLandmarker() {
+async function createTrackers() {
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
     );
@@ -213,16 +232,67 @@ async function createHandLandmarker() {
         statusText.textContent = "Click the button to request webcam access.";
     }
 }
-createHandLandmarker();
+createTrackers();
 
 if (gameCanvas) {
     createActiveGameForSport('tennis');
 }
 
 function refreshGameRendererSize() {
-    if (activeGameInstance) {
+    if (activeGameInstance && typeof activeGameInstance.draw === 'function') {
         activeGameInstance.draw();
     }
+}
+
+function drawTrackingOverlay(nowMs) {
+    if (!trackingOverlay || !video) return;
+    const ctx = trackingOverlay.getContext('2d');
+    if (!ctx) return;
+
+    const width = Math.max(1, Math.floor(video.clientWidth || trackingOverlay.clientWidth || 1));
+    const height = Math.max(1, Math.floor(video.clientHeight || trackingOverlay.clientHeight || 1));
+    if (trackingOverlay.width !== width || trackingOverlay.height !== height) {
+        trackingOverlay.width = width;
+        trackingOverlay.height = height;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+    if (currentSport !== 'boxing' || !boxingGameInstance) return;
+
+    const overlay = boxingGameInstance.getOverlayTargets();
+
+    const smoothed = overlay.smoothedHand;
+    if (smoothed) {
+        const x = smoothed.x * width;
+        const y = smoothed.y * height;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#9fd4ff';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+    }
+}
+
+function updateScoreboard() {
+    const isTennis = currentSport === 'tennis' && tennisGame3DInstance;
+    const isBadminton = currentSport === 'badminton' && badmintonGameInstance;
+    const isBoxing = currentSport === 'boxing' && boxingGameInstance;
+    const game = isTennis ? tennisGame3DInstance : (isBadminton ? badmintonGameInstance : (isBoxing ? boxingGameInstance : null));
+    const scoreValue = isBadminton
+        ? (game?.scorePlayer ?? game?.score ?? 0)
+        : (game?.score ?? 0);
+    const highScoreValue = isBadminton
+        ? (game?.scoreAI ?? game?.highScore ?? 0)
+        : (game?.highScore ?? 0);
+    const missValue = isBoxing ? (boxingGameInstance.missCount || 0) : 0;
+
+    if (rallyScoreEl) rallyScoreEl.textContent = String(scoreValue);
+    if (highScoreEl) highScoreEl.textContent = String(highScoreValue);
+    if (missCountEl) missCountEl.textContent = String(missValue);
+    const rallyLabel = document.querySelector('.score-item .score-label');
+    if (rallyLabel) rallyLabel.textContent = currentSport === 'boxing' ? 'Score' : 'Rally';
 }
 
 window.addEventListener('resize', refreshGameRendererSize);
@@ -230,23 +300,30 @@ window.addEventListener('resize', refreshGameRendererSize);
 document.querySelectorAll('.sport-card').forEach(card => {
     card.addEventListener('click', () => {
         const sport = card.getAttribute('data-sport');
-        if (sport !== 'tennis' && sport !== 'badminton') return;
+        if (sport !== 'tennis' && sport !== 'badminton' && sport !== 'boxing') return;
 
         currentSport = sport;
         createActiveGameForSport(sport);
 
         if (gameTitle) {
-            gameTitle.textContent = sport === 'tennis' ? '🏓 3D Webcam Table Tennis' : '🏸 3D Webcam Badminton';
+            gameTitle.textContent =
+                sport === 'tennis' ? '🏓 3D Webcam Table Tennis'
+                : sport === 'badminton' ? '🏸 3D Webcam Badminton'
+                : '🥊 3D Webcam Boxing';
         }
         if (gameSubtitle) {
-            gameSubtitle.textContent = sport === 'tennis'
-                ? 'Depth-based, hand-tracked table tennis in 3D.'
-                : 'Swing naturally to drive, clear, and smash in 3D.';
+            gameSubtitle.textContent =
+                sport === 'tennis' ? 'Depth-based, hand-tracked table tennis in 3D.'
+                : sport === 'badminton' ? 'Swing naturally to drive, clear, and smash in 3D.'
+                : 'Reaction mode: hit timed targets before they expire.';
         }
         if (gameHint) {
-            gameHint.textContent = sport === 'tennis'
-                ? "💡 Move your hand left/right for paddle placement and toward/away from camera for depth control."
-                : "💡 Use broad swings and forward/backward hand motion to shape shuttle direction and power.";
+            gameHint.textContent =
+                sport === 'tennis'
+                    ? "💡 Move your hand left/right for paddle placement and toward/away from camera for depth control."
+                    : sport === 'badminton'
+                        ? "💡 Use broad swings and forward/backward hand motion to shape shuttle direction and power."
+                        : "💡 Keep your eyes on the big game screen. Touch red target quickly: hit = +1, miss = -1, 3 misses reset.";
         }
 
         navbarLinks.forEach(l => l.classList.remove('active'));
@@ -260,9 +337,10 @@ document.querySelectorAll('.sport-card').forEach(card => {
 
         if (hasWebcamStream && startButton) {
             startButton.style.display = 'none';
-            statusText.textContent = "✅ " + (sport === 'tennis' ? "Webcam Table Tennis Active!" : "Webcam Badminton Active!");
-            logActivity(sport === 'tennis' ? 'Table Tennis' : 'Badminton');
+            statusText.textContent = "✅ " + (sport === 'tennis' ? "Webcam Table Tennis Active!" : sport === 'badminton' ? "Webcam Badminton Active!" : "Webcam Boxing Active!");
+            logActivity(sport === 'tennis' ? 'Table Tennis' : sport === 'badminton' ? 'Badminton' : 'Boxing');
         }
+        updateScoreboard();
     });
 });
 
@@ -284,9 +362,11 @@ async function startWebcam() {
         
         video.addEventListener("playing", () => {
             if (startButton) startButton.style.display = 'none';
-            statusText.textContent = currentSport === 'tennis' 
+            statusText.textContent = currentSport === 'tennis'
                 ? "✅ Webcam started! Raise your hand to play table tennis."
-                : "✅ Webcam started! Raise your hand to play badminton.";
+                : currentSport === 'badminton'
+                    ? "✅ Webcam started! Raise your hand to play badminton."
+                    : "✅ Webcam started! Watch the main game screen and move your hand to hit targets.";
                 
             if (!isRunning) {
                 isRunning = true;
@@ -294,7 +374,7 @@ async function startWebcam() {
                 lastFrameTime = performance.now();
                 requestAnimationFrame(gameLoop);
             }
-            logActivity(currentSport === 'tennis' ? 'Table Tennis' : 'Badminton');
+            logActivity(currentSport === 'tennis' ? 'Table Tennis' : currentSport === 'badminton' ? 'Badminton' : 'Boxing');
         });
     } catch (err) {
         console.error("Error accessing webcam:", err);
@@ -318,11 +398,14 @@ async function gameLoop(timestamp) {
     if (handLandmarker && video.readyState >= 2) {
         if (lastVideoTime !== video.currentTime) {
             lastVideoTime = video.currentTime;
-            const results = handLandmarker.detectForVideo(video, performance.now());
-            if (results.landmarks && results.landmarks.length > 0) {
-                currentLandmarks = results.landmarks;
-                const indexFingerTip = results.landmarks[0][8];
-                const wrist = results.landmarks[0][0];
+            const handsResults = handLandmarker.detectForVideo(video, performance.now());
+            currentTracking = {
+                hands: handsResults?.landmarks && handsResults.landmarks.length > 0 ? handsResults.landmarks : null
+            };
+
+            if (currentTracking.hands && currentTracking.hands.length > 0) {
+                const indexFingerTip = currentTracking.hands[0][8];
+                const wrist = currentTracking.hands[0][0];
                 const rawY = ((indexFingerTip.y * 0.65) + (wrist.y * 0.35)) * gameCanvas.height;
 
                 if (lastDetectionTimestamp > 0) {
@@ -335,6 +418,8 @@ async function gameLoop(timestamp) {
                 lastDetectionY = rawY;
                 lastDetectionTimestamp = timestamp;
                 handVisible = true;
+                gotFreshDetection = true;
+            } else if (currentSport === 'boxing') {
                 gotFreshDetection = true;
             }
         }
@@ -352,7 +437,7 @@ async function gameLoop(timestamp) {
         } else {
             handVisible = false;
             detectionVelocityY *= 0.85;
-            currentLandmarks = null;
+            currentTracking = { hands: null };
         }
     }
 
@@ -363,9 +448,15 @@ async function gameLoop(timestamp) {
         createActiveGameForSport(currentSport);
     }
     if (activeGameInstance) {
-        activeGameInstance.update(currentLandmarks, dtMs, timestamp);
-        activeGameInstance.draw();
+        if (currentSport === 'badminton' && typeof activeGameInstance.updateAndRender === 'function') {
+            activeGameInstance.updateAndRender(null, dtMs, currentTracking?.hands, timestamp);
+        } else {
+            activeGameInstance.update(currentTracking, dtMs, timestamp);
+            activeGameInstance.draw();
+        }
     }
+    drawTrackingOverlay(timestamp);
+    updateScoreboard();
     
     requestAnimationFrame(gameLoop);
 }

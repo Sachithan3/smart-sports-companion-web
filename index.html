@@ -175,17 +175,17 @@
                 </div>
             </div>
 
-            <!-- Football Card -->
-            <div class="sport-card" data-sport="football">
-                <div class="sport-icon">⚽</div>
+            <!-- Boxing Card -->
+            <div class="sport-card" data-sport="boxing">
+                <div class="sport-icon">🥊</div>
                 <div class="sport-content">
-                    <div class="sport-title">Football</div>
-                    <div class="sport-difficulty">⭐⭐ Difficulty: Advanced</div>
+                    <div class="sport-title">Boxing</div>
+                    <div class="sport-difficulty">⭐⭐ Difficulty: Intermediate</div>
                     <p style="text-align: center; color: #d0d4ff; margin-bottom: 1rem;">
-                        Control the ball with full-body motion. Kick, dribble, and score goals using your movements!
+                        Punch dynamic targets using hand tracking. Land clean forward strikes and build combos.
                     </p>
                     <div style="text-align: center;">
-                        <span class="sport-badge badge-soon">🚀 Coming Soon</span>
+                        <span class="sport-badge badge-play">▶ Play Now</span>
                     </div>
                 </div>
             </div>
@@ -234,12 +234,27 @@
                     </div>
                     <div class="video-preview">
                         <video id="video" autoplay playsinline></video>
+                        <canvas id="trackingOverlay"></canvas>
                     </div>
                 </div>
 
                 <!-- Right Panel: Game Canvas -->
                 <div class="game-canvas-container">
-                    <canvas id="gameCanvas" style="display:block" width="640" height="400"></canvas>
+                    <div class="game-scoreboard">
+                        <div class="score-item">
+                            <span class="score-label">Rally</span>
+                            <span id="rallyScore" class="score-value">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-label">Misses</span>
+                            <span id="missCount" class="score-value">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-label">High Score</span>
+                            <span id="highScore" class="score-value">0</span>
+                        </div>
+                    </div>
+                    <canvas id="gameCanvas" style="display:block" width="960" height="540"></canvas>
                     <p class="game-hint">
                         💡 Tip: Big vertical hand movements on the left side of the camera work best for moving your racket across the table.
                     </p>
