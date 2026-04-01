@@ -107,6 +107,18 @@
             </div>
         </div>
 
+        <div class="home-calendar-wrapper">
+            <div class="calendar-header">
+                <h3>Manual Calories Log</h3>
+            </div>
+            <div class="manual-calorie-form">
+                <input type="number" id="manualCaloriesInput" min="1" placeholder="Calories burned (e.g. 120)" />
+                <input type="text" id="manualCaloriesNote" maxlength="80" placeholder="Quick note (e.g. Evening walk)" />
+                <button id="addManualCaloriesBtn" class="btn btn-secondary">Add</button>
+            </div>
+            <div id="manualCaloriesList" class="manual-calorie-list"></div>
+        </div>
+
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">💪</div>
@@ -114,9 +126,13 @@
                 <div class="stat-label">Your BMI</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🏓</div>
-                <div class="stat-value">Table Tennis</div>
-                <div class="stat-label">Selected Sport</div>
+                <div class="stat-icon">🏆</div>
+                <div class="stat-value" style="font-size: 1.15rem; line-height: 1.8;">
+                    <div>🏓 <strong id="homeHighTennis">0</strong></div>
+                    <div>🥊 <strong id="homeHighBoxing">0</strong></div>
+                    <div>🏸 <strong id="homeHighBadminton">0</strong></div>
+                </div>
+                <div class="stat-label">Current High Scores</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">🔥</div>

@@ -2,7 +2,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const sportImages = {
         tennis: "images/table-tennis.png",
-        boxing: "images/table-tennis.png",
+        boxing: "images/boxing.png",
         badminton: "images/badminton.png",
         basketball: "images/basketball.png"
     };
@@ -38,14 +38,14 @@ navLinks.forEach(link => {
         e.preventDefault();
         const targetHref = link.getAttribute('href');
         if (!targetHref || !targetHref.startsWith('#')) return;
-        
+
         const targetId = targetHref.substring(1);
-        
+
         // Update active states correctly in Navbar
         navbarLinks.forEach(l => l.classList.remove('active'));
         const correspondingNav = document.querySelector(`nav .nav-link[href="${targetHref}"]`);
         if (correspondingNav) correspondingNav.classList.add('active');
-        
+
         // Show target section with smooth transition
         sections.forEach(section => {
             section.classList.remove('active');
@@ -73,15 +73,15 @@ if (savedWeight && weightInput) weightInput.value = savedWeight;
 function calculateBMI() {
     const height = parseFloat(heightInput.value);
     const weight = parseFloat(weightInput.value);
-    
+
     if (height > 0 && weight > 0) {
         const heightInMeters = height / 100;
         const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(1);
-        
+
         // Update BMI display
         bmiValueEl.textContent = bmi;
         dashBMI.textContent = bmi;
-        
+
         // Determine category and color
         let category, color, barWidth;
         if (bmi < 18.5) {
@@ -101,7 +101,7 @@ function calculateBMI() {
             color = '#ff5252';
             barWidth = '100%';
         }
-        
+
         bmiCategoryEl.textContent = category;
         bmiValueEl.style.color = color;
         bmiBarFill.style.width = barWidth;
@@ -170,6 +170,200 @@ let score = 0;
 let highScore = 0;
 let isRunning = false;
 let lastFrameTime = performance.now();
+const SPORT_MET = {
+    tennis: 4.0,
+    boxing: 7.0,
+    badminton: 5.5
+};
+const SPORT_LABEL = {
+    tennis: 'Table Tennis',
+    boxing: 'Boxing',
+    badminton: 'Badminton'
+};
+const SESSION_WEIGHT_KG = 70;
+const CALORIE_DISPLAY_SCALE = 0.05;
+const CALORIES_GOAL = 2000;
+const DAILY_CALORIES_KEY = 'sportsCompDailyCalories';
+const MANUAL_CAL_LOG_KEY = 'sportsCompManualCaloriesLog';
+const DEFAULT_DAILY_CALORIES = 450;
+const CALORIE_RESET_V2_KEY = 'sportsCompCalorieResetV2';
+const SPORT_HIGHSCORE_KEYS = {
+    tennis: 'sportsCompHighScoreTennis',
+    boxing: 'sportsCompHighScoreBoxing',
+    badminton: 'sportsCompHighScoreBadminton'
+};
+const savedDailyCalories = Number(localStorage.getItem(DAILY_CALORIES_KEY));
+let dailyCaloriesBurned = Number.isFinite(savedDailyCalories) && savedDailyCalories > 0 ? savedDailyCalories : DEFAULT_DAILY_CALORIES;
+if (!Number.isFinite(savedDailyCalories) || savedDailyCalories === 1240) {
+    dailyCaloriesBurned = DEFAULT_DAILY_CALORIES;
+    localStorage.setItem(DAILY_CALORIES_KEY, String(DEFAULT_DAILY_CALORIES));
+}
+let sportHighScores = {
+    tennis: Math.max(0, Number(localStorage.getItem(SPORT_HIGHSCORE_KEYS.tennis)) || 0),
+    boxing: Math.max(0, Number(localStorage.getItem(SPORT_HIGHSCORE_KEYS.boxing)) || 0),
+    badminton: Math.max(0, Number(localStorage.getItem(SPORT_HIGHSCORE_KEYS.badminton)) || 0)
+};
+const sessionState = {
+    isActive: false,
+    startTimeMs: null,
+    sport: null,
+    calories: 0,
+    durationSeconds: 0
+};
+let manualCaloriesLog = (() => {
+    const saved = localStorage.getItem(MANUAL_CAL_LOG_KEY);
+    if (!saved) return [];
+    try {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+})();
+
+if (localStorage.getItem(CALORIE_RESET_V2_KEY) !== 'done') {
+    dailyCaloriesBurned = DEFAULT_DAILY_CALORIES;
+    manualCaloriesLog = [];
+    localStorage.setItem(DAILY_CALORIES_KEY, String(DEFAULT_DAILY_CALORIES));
+    localStorage.setItem(MANUAL_CAL_LOG_KEY, JSON.stringify([]));
+    localStorage.setItem(CALORIE_RESET_V2_KEY, 'done');
+}
+
+function getSportLabel(sport) {
+    return SPORT_LABEL[sport] || 'Workout';
+}
+
+function resetSessionStateForSport(sport) {
+    sessionState.isActive = false;
+    sessionState.startTimeMs = null;
+    sessionState.sport = sport;
+    sessionState.calories = 0;
+    sessionState.durationSeconds = 0;
+}
+
+function updateStartButtonState() {
+    if (!startButton) return;
+    startButton.style.display = 'block';
+    startButton.style.visibility = 'visible';
+    startButton.style.opacity = '1';
+    startButton.disabled = false;
+
+    if (!hasWebcamStream) {
+        startButton.textContent = "🚀 Start Game (Allow Webcam)";
+        return;
+    }
+    startButton.textContent = sessionState.isActive ? "🛑 End Session" : "▶ Start Session";
+}
+
+function updateHomeHighScoresDisplay() {
+    const tennisEl = document.getElementById('homeHighTennis');
+    const boxingEl = document.getElementById('homeHighBoxing');
+    const badmintonEl = document.getElementById('homeHighBadminton');
+    if (tennisEl) tennisEl.textContent = String(sportHighScores.tennis || 0);
+    if (boxingEl) boxingEl.textContent = String(sportHighScores.boxing || 0);
+    if (badmintonEl) badmintonEl.textContent = String(sportHighScores.badminton || 0);
+}
+
+function renderManualCaloriesLog() {
+    const listEl = document.getElementById('manualCaloriesList');
+    if (!listEl) return;
+    if (!manualCaloriesLog.length) {
+        listEl.innerHTML = '<div class="manual-calorie-item"><span class="manual-calorie-amount">0 cal</span><span class="manual-calorie-note">No manual entries yet.</span></div>';
+        return;
+    }
+    listEl.innerHTML = manualCaloriesLog
+        .slice()
+        .reverse()
+        .map((item) => `
+            <div class="manual-calorie-item">
+                <span class="manual-calorie-amount">+${item.calories} cal</span>
+                <span class="manual-calorie-note">${item.note}</span>
+            </div>
+        `).join('');
+}
+
+function addManualCaloriesEntry() {
+    const caloriesInput = document.getElementById('manualCaloriesInput');
+    const noteInput = document.getElementById('manualCaloriesNote');
+    if (!caloriesInput || !noteInput) return;
+
+    const calories = Math.round(Number(caloriesInput.value));
+    const note = String(noteInput.value || '').trim();
+    if (!Number.isFinite(calories) || calories <= 0 || !note) return;
+
+    manualCaloriesLog.push({ calories, note });
+    localStorage.setItem(MANUAL_CAL_LOG_KEY, JSON.stringify(manualCaloriesLog));
+
+    dailyCaloriesBurned += calories;
+    localStorage.setItem(DAILY_CALORIES_KEY, String(dailyCaloriesBurned));
+    updateCaloriesProgress();
+    renderManualCaloriesLog();
+
+    caloriesInput.value = '';
+    noteInput.value = '';
+}
+
+function persistHighScoreForSport(sportKey, value) {
+    if (!sportKey || !Object.prototype.hasOwnProperty.call(sportHighScores, sportKey)) return;
+    const nextValue = Math.max(0, Number(value) || 0);
+    if (nextValue <= sportHighScores[sportKey]) return;
+    sportHighScores[sportKey] = nextValue;
+    localStorage.setItem(SPORT_HIGHSCORE_KEYS[sportKey], String(nextValue));
+    updateHomeHighScoresDisplay();
+}
+
+function startSession() {
+    resetSessionStateForSport(currentSport);
+    sessionState.isActive = true;
+    sessionState.startTimeMs = Date.now();
+    updateStartButtonState();
+    if (statusText) {
+        statusText.textContent = `✅ ${getSportLabel(currentSport)} session started. Click "End Session" when done.`;
+    }
+}
+
+function endSession(reason = 'manual-end') {
+    if (!sessionState.isActive || !sessionState.startTimeMs) return null;
+
+    const endTimeMs = Date.now();
+    const rawDurationSec = Math.floor((endTimeMs - sessionState.startTimeMs) / 1000);
+    const durationSeconds = Math.max(1, Number.isFinite(rawDurationSec) ? rawDurationSec : 1);
+    const durationHours = durationSeconds / 3600;
+    const metValue = SPORT_MET[sessionState.sport] ?? SPORT_MET[currentSport] ?? 4.0;
+    const actualCalories = metValue * SESSION_WEIGHT_KG * durationHours;
+    const displayCaloriesRaw = actualCalories * CALORIE_DISPLAY_SCALE;
+    let displayCalories = Math.round(displayCaloriesRaw);
+    if (durationSeconds >= 5 && displayCalories === 0) displayCalories = 1;
+
+    sessionState.durationSeconds = durationSeconds;
+    sessionState.calories = Math.max(0, Number.isFinite(displayCalories) ? displayCalories : 0);
+    sessionState.isActive = false;
+    sessionState.startTimeMs = null;
+
+    dailyCaloriesBurned += sessionState.calories;
+    localStorage.setItem(DAILY_CALORIES_KEY, String(dailyCaloriesBurned));
+    updateCaloriesProgress();
+
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    const durationLabel = `${minutes}m ${seconds}s`;
+    const sportLabel = getSportLabel(sessionState.sport || currentSport);
+
+    logActivity({
+        sport: sportLabel,
+        duration: durationLabel,
+        durationSeconds,
+        calories: sessionState.calories,
+        notes: `Completed ${sportLabel} session`,
+        reason
+    });
+
+    if (statusText) {
+        statusText.textContent = `🏁 Ended ${sportLabel} (${durationLabel}) • Calories: ${sessionState.calories}`;
+    }
+    updateStartButtonState();
+    return { durationSeconds, durationLabel, sportLabel, calories: sessionState.calories };
+}
 
 function createActiveGameForSport(sport) {
     if (!gameCanvas) return;
@@ -224,7 +418,7 @@ async function createTrackers() {
         runningMode: "VIDEO",
         numHands: 1
     });
-    
+
     // Enable start button
     if (startButton) {
         startButton.disabled = false;
@@ -284,15 +478,24 @@ function updateScoreboard() {
         ? (game?.scorePlayer ?? game?.score ?? 0)
         : (game?.score ?? 0);
     const highScoreValue = isBadminton
-        ? (game?.scoreAI ?? game?.highScore ?? 0)
+        ? (game?.highScore ?? 0)
         : (game?.highScore ?? 0);
-    const missValue = isBoxing ? (boxingGameInstance.missCount || 0) : 0;
+    const missValue = isBadminton
+        ? (game?.scoreAI ?? 0)
+        : (isBoxing ? (boxingGameInstance.missCount || 0) : 0);
 
     if (rallyScoreEl) rallyScoreEl.textContent = String(scoreValue);
     if (highScoreEl) highScoreEl.textContent = String(highScoreValue);
     if (missCountEl) missCountEl.textContent = String(missValue);
-    const rallyLabel = document.querySelector('.score-item .score-label');
-    if (rallyLabel) rallyLabel.textContent = currentSport === 'boxing' ? 'Score' : 'Rally';
+    if (currentSport === 'tennis' || currentSport === 'boxing' || currentSport === 'badminton') {
+        persistHighScoreForSport(currentSport, highScoreValue);
+    }
+    const scoreLabels = document.querySelectorAll('.score-item .score-label');
+    if (scoreLabels.length >= 3) {
+        scoreLabels[0].textContent = currentSport === 'badminton' ? 'Player Score' : (currentSport === 'boxing' ? 'Score' : 'Rally');
+        scoreLabels[1].textContent = currentSport === 'badminton' ? 'Opponent Score' : 'Misses';
+        scoreLabels[2].textContent = 'High Score';
+    }
 }
 
 window.addEventListener('resize', refreshGameRendererSize);
@@ -301,21 +504,25 @@ document.querySelectorAll('.sport-card').forEach(card => {
     card.addEventListener('click', () => {
         const sport = card.getAttribute('data-sport');
         if (sport !== 'tennis' && sport !== 'badminton' && sport !== 'boxing') return;
+        if (sessionState.isActive) {
+            endSession('sport-switch');
+        }
 
         currentSport = sport;
         createActiveGameForSport(sport);
+        resetSessionStateForSport(sport);
 
         if (gameTitle) {
             gameTitle.textContent =
                 sport === 'tennis' ? '🏓 3D Webcam Table Tennis'
-                : sport === 'badminton' ? '🏸 3D Webcam Badminton'
-                : '🥊 3D Webcam Boxing';
+                    : sport === 'badminton' ? '🏸 3D Webcam Badminton'
+                        : '🥊 3D Webcam Boxing';
         }
         if (gameSubtitle) {
             gameSubtitle.textContent =
                 sport === 'tennis' ? 'Depth-based, hand-tracked table tennis in 3D.'
-                : sport === 'badminton' ? 'Swing naturally to drive, clear, and smash in 3D.'
-                : 'Reaction mode: hit timed targets before they expire.';
+                    : sport === 'badminton' ? 'Swing naturally to drive, clear, and smash in 3D.'
+                        : 'Reaction mode: hit timed targets before they expire.';
         }
         if (gameHint) {
             gameHint.textContent =
@@ -336,9 +543,8 @@ document.querySelectorAll('.sport-card').forEach(card => {
         requestAnimationFrame(refreshGameRendererSize);
 
         if (hasWebcamStream && startButton) {
-            startButton.style.display = 'none';
-            statusText.textContent = "✅ " + (sport === 'tennis' ? "Webcam Table Tennis Active!" : sport === 'badminton' ? "Webcam Badminton Active!" : "Webcam Boxing Active!");
-            logActivity(sport === 'tennis' ? 'Table Tennis' : sport === 'badminton' ? 'Badminton' : 'Boxing');
+            statusText.textContent = "✅ " + (sport === 'tennis' ? "Webcam Table Tennis ready." : sport === 'badminton' ? "Webcam Badminton ready." : "Webcam Boxing ready.") + " Click Start Session.";
+            updateStartButtonState();
         }
         updateScoreboard();
     });
@@ -359,22 +565,21 @@ async function startWebcam() {
         });
         video.srcObject = stream;
         hasWebcamStream = true;
-        
+
         video.addEventListener("playing", () => {
-            if (startButton) startButton.style.display = 'none';
             statusText.textContent = currentSport === 'tennis'
-                ? "✅ Webcam started! Raise your hand to play table tennis."
+                ? "✅ Webcam started! Raise your hand to play table tennis. Click Start Session."
                 : currentSport === 'badminton'
-                    ? "✅ Webcam started! Raise your hand to play badminton."
-                    : "✅ Webcam started! Watch the main game screen and move your hand to hit targets.";
-                
+                    ? "✅ Webcam started! Raise your hand to play badminton. Click Start Session."
+                    : "✅ Webcam started! Watch the main game screen and move your hand to hit targets. Click Start Session.";
+
             if (!isRunning) {
                 isRunning = true;
                 resetCurrentGame();
                 lastFrameTime = performance.now();
                 requestAnimationFrame(gameLoop);
             }
-            logActivity(currentSport === 'tennis' ? 'Table Tennis' : currentSport === 'badminton' ? 'Badminton' : 'Boxing');
+            updateStartButtonState();
         });
     } catch (err) {
         console.error("Error accessing webcam:", err);
@@ -457,7 +662,7 @@ async function gameLoop(timestamp) {
     }
     drawTrackingOverlay(timestamp);
     updateScoreboard();
-    
+
     requestAnimationFrame(gameLoop);
 }
 
@@ -465,6 +670,12 @@ if (startButton) {
     startButton.addEventListener("click", async () => {
         if (!hasWebcamStream) {
             await startWebcam();
+            return;
+        }
+        if (sessionState.isActive) {
+            endSession();
+        } else {
+            startSession();
         }
     });
 }
@@ -487,45 +698,36 @@ function getActivityData() {
     return data ? JSON.parse(data) : {};
 }
 
-function logActivity(sportName) {
+function logActivity(activityDetails) {
     const activities = getActivityData();
     const today = new Date().toISOString().split('T')[0];
-    
+
     if (!activities[today]) {
         activities[today] = [];
     }
-    
-    // Only log once per sport per day to keep heatmap clean
-    if (!activities[today].some(a => a.sport === sportName)) {
-        activities[today].push({
-            sport: sportName,
-            time: new Date().toLocaleTimeString(),
-            duration: 'Active session',
-            notes: 'Completed a session of ' + sportName
-        });
-        localStorage.setItem('sportsCompActivity', JSON.stringify(activities));
-        // Refresh the heatmap
-        generateCalendarHeatmap();
-    }
-}
 
-// Replace mock function with real data fetcher
-function generateMockActivityData() {
-    return getActivityData();
+    activities[today].push({
+        sport: activityDetails.sport,
+        time: new Date().toLocaleTimeString(),
+        duration: activityDetails.duration,
+        durationSeconds: activityDetails.durationSeconds,
+        calories: activityDetails.calories,
+        notes: activityDetails.notes
+    });
+    localStorage.setItem('sportsCompActivity', JSON.stringify(activities));
+    generateCalendarHeatmap();
 }
-
-const mockActivityData = generateMockActivityData();
 
 // Update BMI indicator position
 function updateBMIIndicator() {
     const bmiValue = parseFloat(document.getElementById('dashBMI').textContent);
     const bmiIndicator = document.getElementById('bmiIndicator');
     const bmiStatusValue = document.getElementById('bmiStatusValue');
-    
+
     if (!bmiIndicator || !bmiStatusValue) return;
-    
+
     bmiStatusValue.textContent = bmiValue;
-    
+
     // Calculate position (BMI range 0-40 mapped to 0-100%)
     // Segments: Underweight (0-18.5) = 18.5%, Normal (18.5-25) = 25%, Overweight (25-30) = 30%, Obese (30-40) = 26.5%
     let position = 0;
@@ -542,7 +744,7 @@ function updateBMIIndicator() {
         // Obese: 30-40 maps to 73.5-100%
         position = 73.5 + Math.min(((bmiValue - 30) / 10) * 26.5, 26.5);
     }
-    
+
     // Clamp to 0-100%
     position = Math.max(0, Math.min(100, position));
     bmiIndicator.style.left = `${position}%`;
@@ -552,15 +754,16 @@ function updateBMIIndicator() {
 function updateCaloriesProgress() {
     const caloriesValue = document.getElementById('caloriesValue');
     const caloriesProgress = document.getElementById('caloriesProgress');
-    
+
     if (!caloriesValue || !caloriesProgress) return;
-    
-    const current = 1240;
-    const goal = 2000;
+
+    const current = Math.max(0, Math.round(Number(dailyCaloriesBurned) || 0));
+    const goal = CALORIES_GOAL;
     const percentage = Math.min((current / goal) * 100, 100);
-    
+    caloriesValue.textContent = current.toLocaleString();
+
     caloriesProgress.style.width = `${percentage}%`;
-    
+
     // Update color based on progress
     if (percentage < 50) {
         caloriesProgress.style.background = 'rgba(255, 167, 38, 0.7)';
@@ -574,47 +777,48 @@ function updateCaloriesProgress() {
 // Generate calendar heatmap
 function generateCalendarHeatmap() {
     if (!homeCalendarHeatmap) return;
-    
+    const allActivityData = getActivityData();
+
     const today = new Date();
     const oneYearAgo = new Date(today);
     oneYearAgo.setFullYear(today.getFullYear() - 1);
     oneYearAgo.setDate(oneYearAgo.getDate() - oneYearAgo.getDay()); // Start from Sunday
-    
+
     const weeks = [];
     let currentDate = new Date(oneYearAgo);
     const endDate = new Date(today);
-    
+
     // Generate weeks
     while (currentDate <= endDate) {
         const week = [];
         for (let i = 0; i < 7; i++) {
             if (currentDate > endDate) break;
-            
+
             const dateKey = currentDate.toISOString().split('T')[0];
-            const activities = mockActivityData[dateKey] || [];
+            const activities = allActivityData[dateKey] || [];
             const intensity = Math.min(4, activities.length);
-            
+
             week.push({
                 date: new Date(currentDate),
                 dateKey: dateKey,
                 activities: activities,
                 intensity: intensity
             });
-            
+
             currentDate.setDate(currentDate.getDate() + 1);
         }
         if (week.length > 0) {
             weeks.push(week);
         }
     }
-    
+
     // Render calendar
     homeCalendarHeatmap.innerHTML = '';
     const totalWeeks = weeks.length;
-    
+
     // Update grid to match number of weeks
     homeCalendarHeatmap.style.gridTemplateColumns = `repeat(${totalWeeks}, 1fr)`;
-    
+
     // Flatten weeks array and render all days
     weeks.forEach((week) => {
         week.forEach((day) => {
@@ -622,21 +826,21 @@ function generateCalendarHeatmap() {
             dayEl.className = 'calendar-day';
             dayEl.setAttribute('data-intensity', day.intensity);
             dayEl.setAttribute('data-date', day.dateKey);
-            
+
             if (day.activities.length > 0) {
                 dayEl.classList.add('has-activity');
             }
-            
+
             // Tooltip
             const dateStr = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const activityCount = day.activities.length;
             dayEl.title = `${dateStr}: ${activityCount} ${activityCount === 1 ? 'activity' : 'activities'}`;
-            
+
             dayEl.addEventListener('click', () => showActivityModal(day.dateKey, day.activities, day.date));
             homeCalendarHeatmap.appendChild(dayEl);
         });
     });
-    
+
     // Generate month labels
     generateMonthLabels(weeks);
 }
@@ -644,10 +848,10 @@ function generateCalendarHeatmap() {
 // Generate month labels
 function generateMonthLabels(weeks) {
     if (!homeCalendarMonthLabels) return;
-    
+
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthPositions = {};
-    
+
     // Find first occurrence of each month (check first day of each week)
     weeks.forEach((week, weekIndex) => {
         if (week.length > 0) {
@@ -658,12 +862,12 @@ function generateMonthLabels(weeks) {
             }
         }
     });
-    
+
     // Render month labels
     homeCalendarMonthLabels.innerHTML = '';
     const sortedMonths = Object.keys(monthPositions).sort((a, b) => monthPositions[a] - monthPositions[b]);
     const totalWeeks = weeks.length;
-    
+
     sortedMonths.forEach(month => {
         const weekIndex = monthPositions[month];
         const label = document.createElement('span');
@@ -677,23 +881,22 @@ function generateMonthLabels(weeks) {
 // Show activity modal for selected date
 function showActivityModal(dateKey, activities, date) {
     if (!activityModal || !activityDate || !activityContent) return;
-    
+
     const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     activityDate.textContent = dateStr;
-    
+
     if (activities.length === 0) {
         activityContent.innerHTML = '<div class="activity-empty">No activities recorded for this date.</div>';
     } else {
         activityContent.innerHTML = activities.map((activity) => {
-            // Calculate calories (mock: ~10 calories per minute)
-            const minutes = parseInt(activity.duration);
-            const calories = minutes * 10;
-            
+            const calories = Number.isFinite(activity.calories) ? activity.calories : 0;
+            const durationText = activity.duration || `${Math.max(1, activity.durationSeconds || 0)}s`;
+
             return `
                 <div class="activity-item">
                     <div class="activity-item-header">
                         <span class="activity-sport">${activity.sport}</span>
-                        <span class="activity-duration">${activity.duration}</span>
+                        <span class="activity-duration">${durationText}</span>
                     </div>
                     <div class="activity-calories">Calories burned: ${calories}</div>
                     ${activity.notes ? `<div class="activity-notes">${activity.notes}</div>` : ''}
@@ -701,7 +904,7 @@ function showActivityModal(dateKey, activities, date) {
             `;
         }).join('');
     }
-    
+
     activityModal.classList.remove('hidden');
 }
 
@@ -739,7 +942,7 @@ if (homeSection) {
         updateBMIIndicator();
         updateCaloriesProgress();
     }
-    
+
     // Initialize when home section becomes active
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -752,7 +955,7 @@ if (homeSection) {
             }
         });
     });
-    
+
     observer.observe(homeSection, { attributes: true });
 }
 
@@ -769,4 +972,14 @@ window.addEventListener('DOMContentLoaded', () => {
     initCalendar();
     updateBMIIndicator();
     updateCaloriesProgress();
+    updateHomeHighScoresDisplay();
+    renderManualCaloriesLog();
+    const addBtn = document.getElementById('addManualCaloriesBtn');
+    const noteInput = document.getElementById('manualCaloriesNote');
+    if (addBtn) addBtn.addEventListener('click', addManualCaloriesEntry);
+    if (noteInput) {
+        noteInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') addManualCaloriesEntry();
+        });
+    }
 });

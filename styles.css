@@ -416,6 +416,56 @@ nav {
     font-size: 1rem;
 }
 
+.manual-calorie-form {
+    display: grid;
+    grid-template-columns: 180px 1fr auto;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.manual-calorie-form input {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+.manual-calorie-form input:focus {
+    outline: none;
+    border-color: rgba(40, 199, 111, 0.65);
+}
+
+.manual-calorie-list {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.manual-calorie-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.manual-calorie-amount {
+    color: #ffce54;
+    font-weight: 700;
+}
+
+.manual-calorie-note {
+    color: #d0d4ff;
+    font-size: 0.92rem;
+    text-align: right;
+}
+
 /* ===== BMI CALCULATOR ===== */
 .bmi-container {
     max-width: 600px;
@@ -678,6 +728,7 @@ nav {
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow: hidden;
     min-height: 640px;
 }
 
@@ -719,9 +770,11 @@ nav {
     border-radius: 12px;
     border: 2px solid rgba(255, 206, 84, 0.3);
     box-shadow: 0 10px 40px rgba(255, 206, 84, 0.2);
-    width: min(78vw, 1080px);
+    width: 100%;
+    max-width: 100%;
     height: auto;
     aspect-ratio: 16 / 9;
+    display: block;
 }
 
 .game-hint {

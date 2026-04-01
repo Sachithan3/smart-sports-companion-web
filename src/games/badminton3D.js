@@ -24,6 +24,8 @@ export class Badminton3D {
 
         // Game State
         this.gameState = 'waiting';
+        this.score = 0;
+        this.highScore = 0;
         this.scorePlayer = 0;
         this.scoreAI = 0;
         this.rallyCount = 0;
@@ -209,6 +211,9 @@ export class Badminton3D {
     }
 
     updateUI() {
+        if (document.getElementById('rallyScore')) document.getElementById('rallyScore').textContent = this.scorePlayer;
+        if (document.getElementById('missCount')) document.getElementById('missCount').textContent = this.scoreAI;
+        if (document.getElementById('highScore')) document.getElementById('highScore').textContent = this.highScore;
         if(document.getElementById('scorePlayer')) document.getElementById('scorePlayer').textContent = this.scorePlayer;
         if(document.getElementById('scoreAI')) document.getElementById('scoreAI').textContent = this.scoreAI;
         if(document.getElementById('rally')) document.getElementById('rally').textContent = this.rallyCount;
@@ -313,12 +318,12 @@ export class Badminton3D {
             let targetY = this.shuttle.position.y + (this.shuttleVelocity.y * flightTime) + (0.5 * this.PHYSICS.gravity * flightTime * flightTime);
             
             // Dynamic rally continuation probability
-            const baseChance = 0.7; // 70% initial
-            const decay = 0.2;      // drop per rally
-            const continueChance = Math.max(0.2, baseChance - (this.rallyCount * decay));
+            const baseChance = 0.55; // lower continuation so AI misses more often
+            const decay = 0.15;      // smoother drop per rally
+            const continueChance = Math.max(0.15, baseChance - (this.rallyCount * decay));
             
             // We use fixed scalars per-rally so the AI racket doesn't jitter from randomizing every frame
-            const seed = (this.scorePlayer * 7 + this.scoreAI * 13 + this.rallyCount * 17) % 100;
+            const seed = (this.score * 7 + this.highScore * 13 + this.rallyCount * 17) % 100;
             const willMiss = (seed / 100.0) > continueChance; 
             
             if (willMiss) {
@@ -400,23 +405,27 @@ export class Badminton3D {
 
         // Check hits ground
         if (this.shuttle.position.y < this.SHUTTLE.radius) {
-            // Determine who scored based on Z position
+            // Point goes to opposite side of landing position
             if (this.shuttle.position.z > 0) {
-                // Landed on player's side
-                this.scoreAI++;
+                this.scoreAI += 1;
             } else {
-                // Landed on AI's side
-                this.scorePlayer++;
+                this.scorePlayer += 1;
+                this.highScore = Math.max(this.highScore, this.scorePlayer);
             }
+            this.score = this.scorePlayer;
             this.resetPoint();
             return;
         }
 
         // Out of bounds X checks
         if (Math.abs(this.shuttle.position.x) > this.COURT.width/2 + 2) {
-            // Wide shot
-            if (this.lastHitter === 'player') this.scoreAI++;
-            else this.scorePlayer++;
+            if (this.lastHitter === 'player') {
+                this.scoreAI += 1;
+            } else {
+                this.scorePlayer += 1;
+                this.highScore = Math.max(this.highScore, this.scorePlayer);
+            }
+            this.score = this.scorePlayer;
             this.resetPoint();
         }
     }
@@ -453,24 +462,28 @@ export class Badminton3D {
                 }
             } else {
                 this.shuttleVelocity.x = (Math.random() - 0.5) * 1.5;
-                this.shuttleVelocity.y = 4.8 + Math.random() * 0.8;
+                this.shuttleVelocity.y = 3.4 + Math.random() * 0.5;
                 this.shuttleVelocity.z = 11.5;
                 
                 // Re-evaluate global miss probability based on current rally
-                const seed = (this.scorePlayer * 7 + this.scoreAI * 13 + this.rallyCount * 17) % 100;
-                const baseChance = 0.7;
-                const decay = 0.2;
-                const continueChance = Math.max(0.2, baseChance - (this.rallyCount * decay));
+                const seed = (this.score * 7 + this.highScore * 13 + this.rallyCount * 17) % 100;
+                const baseChance = 0.55;
+                const decay = 0.15;
+                const continueChance = Math.max(0.15, baseChance - (this.rallyCount * decay));
                 const willMiss = (seed / 100.0) > continueChance; 
                 
-                if (willMiss && Math.random() < 0.4) {
-                    // Weak return → easy for player
-                    this.shuttleVelocity.y *= 0.6;
-                    this.shuttleVelocity.z *= 0.7;
+                if (willMiss && Math.random() < 0.8) {
+                    // Clear AI miss: award player immediately and reset point
+                    this.scorePlayer += 1;
+                    this.score = this.scorePlayer;
+                    this.highScore = Math.max(this.highScore, this.scorePlayer);
+                    this.updateUI();
+                    this.resetPoint();
+                    return;
                 } else {
                     const minClearHeight = this.NET.height + 0.2;
                     if (this.shuttle.position.y < minClearHeight) {
-                        this.shuttleVelocity.y += 2.0; // force lift
+                        this.shuttleVelocity.y += 1.0; // force lift but keep returns playable
                     }
                 }
                 
@@ -482,18 +495,19 @@ export class Badminton3D {
             }
             
             this.lastHitter = hitter;
-            this.rallyCount++;
+            this.rallyCount += 1;
             this.updateUI();
         }
     }
 
     startGame() {
-        if(this.gameState === 'waiting') {
-            this.scorePlayer = 0;
-            this.scoreAI = 0;
-            this.updateUI();
-            this.resetPoint();
-        }
+        this.score = 0;
+        this.highScore = 0;
+        this.scorePlayer = 0;
+        this.scoreAI = 0;
+        this.rallyCount = 0;
+        this.updateUI();
+        this.resetPoint();
     }
 
     updateAndRender(handPos, dtMs, landmarks, timestamp) {
